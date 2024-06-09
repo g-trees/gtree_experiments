@@ -1,6 +1,6 @@
 use std::{cmp::*, rc::Rc};
 
-use crate::{Set, GTree, NonemptySet};
+use crate::{Set, GTree, NonemptySet, NonemptySetMeta};
 
 /// A k-list, except for a few optimization details:
 ///
@@ -76,6 +76,18 @@ impl<const K: usize, I: Clone + Ord> NonemptyReverseKList<K, I> {
                         }),
                     );
                 }
+            }
+        }
+    }
+
+    // Internal helper function: get an item by index, where index 0 denotes the *greatest* item.
+    fn get_by_inverted_index(&self, index: usize) -> Option<&I> {
+        if index < K {
+            return self.data[index].as_ref().map(|(item, _)| item);
+        } else {
+            match self.next {
+                Some(ref next) => return next.get_by_inverted_index(index - K),
+                None => return None,
             }
         }
     }
@@ -183,13 +195,13 @@ impl<const K: usize, I: Clone + Ord> NonemptySet for NonemptyReverseKList<K, I> 
             Ok(i) => {
                 // We contain the key at index i.
 
-                // First, we compute the left return.
-                let left = if i == 0 {
-                    // The key is the very first item, so the left return is the empty set.
+                // First, we compute the right return.
+                let right = if i == 0 {
+                    // The key is the very first item, so the right return is the empty set.
                     Set::Empty
                 } else {
-                    // The left return contains all the items up to but excluding index i.
-                    let left_data = std::array::from_fn(|j| {
+                    // The right return contains all the items up to but excluding index i.
+                    let right_data = std::array::from_fn(|j| {
                         if j < i {
                             return self.data[j].clone();
                         } else {
@@ -197,59 +209,59 @@ impl<const K: usize, I: Clone + Ord> NonemptySet for NonemptyReverseKList<K, I> 
                         }
                     });
                     Set::NonEmpty(NonemptyReverseKList {
-                        data: left_data,
+                        data: right_data,
                         next: None,
                     })
                 };
 
-                // We obtain the right return by removing our first `i` items.
-                let (_, right) = self.remove_n_max(i);
+                // We obtain the left return by removing our first `i` items.
+                let (_, left) = self.remove_n_max(i);
 
                 return (
-                    left,
-                    Some(self.data[i].as_ref().unwrap(/* binary search returned i*/).1.clone()),
-                    match right {
+                    match left {
                         None => Set::Empty,
-                        Some(r) => Set::NonEmpty(r),
-                    }
+                        Some(l) => Set::NonEmpty(l),
+                    },
+                    Some(self.data[i].as_ref().unwrap(/* binary search returned i*/).1.clone()),
+                    right,
                 );
             }
             Err(i) => {
                 // We do not contain the key.
 
                 if i == K {
-                    // We contain no item greater than the key.
+                    // We contain no item less than the key.
 
                     match self.next {
                         None => {
-                            // All items are less than the key.
-                            return (Set::NonEmpty(self.clone()), None, Set::Empty);
+                            // All items are greater than the key.
+                            return (Set::Empty, None, Set::NonEmpty(self.clone()));
                         }
                         Some(ref next) => {
-                            // Recurse and join ourselves to the left of the left recursive return.
-                            let (left_rec, mid_rec, right_rec) = next.split(key);
+                            // Recurse and join ourselves to the right of the right recursive return.
+                            let (right_rec, mid_rec, left_rec) = next.split(key);
 
-                            match left_rec {
-                                Set::Empty => return (Set::NonEmpty(self.clone()), mid_rec, right_rec),
-                                Set::NonEmpty(left_rec) => return (
-                                    Set::NonEmpty(Self::join(self, &left_rec)),
+                            match right_rec {
+                                Set::Empty => return (left_rec, mid_rec, Set::NonEmpty(self.clone())),
+                                Set::NonEmpty(right_rec) => return (
+                                    left_rec,
                                     mid_rec,
-                                    right_rec,
+                                    Set::NonEmpty(Self::join(self, &right_rec)),
                                 ),
                             }
                         }
                     }
                 } else {
-                    // i is less than K, so we contain i items less than the key,
-                    // and at least one item greater than the key.
+                    // i is less than K, so we contain i items greater than the key,
+                    // and at least one item less than the key.
 
-                    // First, we compute the left return.
-                    let left = if i == 0 {
-                        // The first item greater than the key is the very first item, so the left return is the empty set.
+                    // First, we compute the right return.
+                    let right = if i == 0 {
+                        // The first item less than the key is the very first item, so the right return is the empty set.
                         Set::Empty
                     } else {
-                        // The left return contains all the items up to but excluding index i.
-                        let left_data = std::array::from_fn(|j| {
+                        // The right return contains all the items up to but excluding index i.
+                        let right_data = std::array::from_fn(|j| {
                             if j < i {
                                 return self.data[j].clone();
                             } else {
@@ -257,21 +269,21 @@ impl<const K: usize, I: Clone + Ord> NonemptySet for NonemptyReverseKList<K, I> 
                             }
                         });
                         Set::NonEmpty(NonemptyReverseKList {
-                            data: left_data,
+                            data: right_data,
                             next: None,
                         })
                     };
 
-                    // We obtain the right return by removing our first `i` items.
-                    let (_, right) = self.remove_n_max(i);
+                    // We obtain the left return by removing our first `i` items.
+                    let (_, left) = self.remove_n_max(i);
 
                     return (
-                        left,
-                        None,
-                        match right {
+                        match left {
                             None => Set::Empty,
-                            Some(r) => Set::NonEmpty(r),
-                        }
+                            Some(l) => Set::NonEmpty(l),
+                        },
+                        None,
+                        right,
                     );
                 }
             }
@@ -324,5 +336,52 @@ impl<const K: usize, I: Clone + Ord> NonemptySet for NonemptyReverseKList<K, I> 
                 }
             }
         }
+    }
+}
+
+impl<const K: usize, I: Clone + Ord> NonemptySetMeta for NonemptyReverseKList<K, I> {
+    /// Return a reference to the maximal item in the set.
+    fn get_max(&self) -> &Self::Item {
+        match self.data[0] {
+            None => unreachable!("List is never empty."),
+            Some((ref item, ref _subtree)) => return item,
+        }
+    }
+
+    /// Return a reference to the minimal item in the set.
+    fn get_min(&self) -> &Self::Item {
+        match self.next {
+            Some(ref next) => {
+                return next.get_min();
+            }
+            None => {
+                for i in K-1..=0 {
+                    if let Some((ref item, _)) = self.data[i] {
+                        return &item;
+                    }
+                }
+                unreachable!("self.data contains at least one item.");
+            }
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self.next {
+            Some(ref next) => {
+                return K + next.len();
+            }
+            None => {
+                for i in 0..K {
+                    if let Some(_) = self.data[i] {
+                        return i;
+                    }
+                }
+                unreachable!("self.data contains at least one item.");
+            }
+        }
+    }
+
+    fn get_by_index(&self, index: usize) -> Option<&Self::Item> {
+        return self.get_by_inverted_index(self.len() - (1 + index));
     }
 }

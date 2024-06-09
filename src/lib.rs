@@ -4,6 +4,13 @@
 pub mod klist;
 
 use std::rc::Rc;
+use std::fmt::Debug;
+
+use arbitrary::{Arbitrary};
+
+/*
+Definitions for NonemptySet and GTrees.
+*/
 
 pub enum Set<S> {
     NonEmpty(S),
@@ -179,9 +186,6 @@ pub fn delete<S: NonemptySet>(
     return zip2(&left, &right);
 }
 
-
-
-
 /// Additional methods for NonemptySets, to allow for testing and statistics gathering.
 pub trait NonemptySetMeta: NonemptySet
 where
@@ -191,9 +195,92 @@ where
     fn get_max(&self) -> &Self::Item;
     /// Return a reference to the minimal item in the set.
     fn get_min(&self) -> &Self::Item;
+    /// Get the number of items in the set.
+    fn len(&self) -> usize;
+    // Get an item by index, where index 0 denotes the least item.
+    fn get_by_index(&self, index: usize) -> Option<&Self::Item>;
+}
+
+pub fn sets_assert_eq<I: Debug + Eq, S1: NonemptySetMeta<Item = I>, S2: NonemptySetMeta<Item = I>>(s1: &S1, s2: &S2) {
+    let len = s1.len();
+    assert_eq!(len, s2.len());
+
+    for i in 0..len {
+        assert_eq!(s1.get_by_index(i), s2.get_by_index(i));
+    }
+}
+
+/*
+Implementation of NonemptySet for a sorted (in descending order) Vec for testing purposes.
+*/
+#[derive(Clone)]
+pub struct ControlSet<I: Clone + Ord>(Vec<(I, GTree<Self>)>);
+
+impl<I: Clone + Ord> NonemptySet for ControlSet<I> {
+    type Item = I;
+
+    fn singleton(item: (Self::Item, GTree<Self>)) -> Self {
+        return ControlSet(vec![item]);
+    }
+
+    fn insert_min(&self, new_min: (Self::Item, GTree<Self>)) -> Self {
+        let mut ret = self.clone();
+        ret.0.push(new_min);
+        return ret;
+    }
+
+    fn remove_min(&self) -> ((Self::Item, GTree<Self>), Set<Self>) {
+        let mut ret = self.clone();
+        let popped = ret.0.pop().unwrap();
+        return (popped, Set::NonEmpty(ret));
+    }
+
+    fn split(&self, key: &Self::Item) -> (Set<Self>, Option<GTree<Self>> /* left subtree of key (if key is in self, else None) */, Set<Self>) {
+        match self.0.binary_search_by(|(my_item, _)| {
+            return key.cmp(my_item);
+        }) {
+            Ok(i) => {
+                let right = self.0[0..i].to_vec();
+                let left = self.0[i+1..].to_vec();
+                return (Set::NonEmpty(ControlSet(left)), Some(self.0[i].1.clone()), Set::NonEmpty(ControlSet(right)));
+            }
+            Err(i) => {
+                let right = self.0[0..i].to_vec();
+                let left = self.0[i..].to_vec();
+                return (Set::NonEmpty(ControlSet(left)), None, Set::NonEmpty(ControlSet(right)));
+            }
+        }
+    }
+
+    fn join(left: &Self, right: &Self) -> Self {
+        let mut new = right.clone();
+        new.0.extend_from_slice(&left.0[..]);
+        return new;
+    }
+}
+
+impl<I: Clone + Ord> NonemptySetMeta for ControlSet<I> {
+    /// Return a reference to the maximal item in the set.
+    fn get_max(&self) -> &Self::Item {
+        return &self.0[0].0;
+    }
+    
+    /// Return a reference to the minimal item in the set.
+    fn get_min(&self) -> &Self::Item {
+        return &self.0[self.0.len() - 1].0;
+    }
+
+    fn len(&self) -> usize {
+        return self.0.len();
+    }
+
+    fn get_by_index(&self, index: usize) -> Option<&Self::Item> {
+        return self.0.get(self.0.len() - (index + 1)).map(|(item, _)| item);
+    }
 }
 
 // Operations for constructing random sets. The subtrees in those sets are always empty.
+// #[derive(Debug, PartialEq, Eq, Arbitrary, Clone)]
 pub enum SetCreationOperation<Item> {
     Singleton(Item),
     RemoveMin(Box<Self>),
