@@ -1,4 +1,4 @@
-use std::{cmp::*, rc::Rc};
+use std::{cmp::*, rc::Rc, fmt::Debug};
 
 use crate::{Set, GTree, NonemptySet, NonemptySetMeta};
 
@@ -6,13 +6,13 @@ use crate::{Set, GTree, NonemptySet, NonemptySetMeta};
 ///
 /// - the list is known to be non-empty, so it always contains at least one vertex, and
 /// - the list stores its items in reverse order, to enable `insert_min` and `remove_min` in O(1) rather than O(n) time.
-#[derive(Clone)]
-pub struct NonemptyReverseKList<const K: usize, I: Clone + Ord> {
+#[derive(Debug, Clone)]
+pub struct NonemptyReverseKList<const K: usize, I: Clone + Ord + Debug> {
     data: [Option<(I, GTree<Self>)>; K],
     next: Option<Rc<Self>>,
 }
 
-impl<const K: usize, I: Clone + Ord> NonemptyReverseKList<K, I> {
+impl<const K: usize, I: Clone + Ord + Debug> NonemptyReverseKList<K, I> {
     // Internal helper function: remove the `n` greatest items from a list, with 1 <= n <= K.
     // Returns first the (up to n) items that were removed, then the valid remaining list (or None if it would be empty).
     fn remove_n_max(&self, n: usize) -> ([Option<(I, GTree<Self>)>; K], Option<Self>) {
@@ -29,6 +29,7 @@ impl<const K: usize, I: Clone + Ord> NonemptyReverseKList<K, I> {
             );
         } else {
             // We need to remove the first n items.
+            // println!("n {}", n);
 
             // First, we pop off the first n items
             let removed: [_; K] = std::array::from_fn(|i| {
@@ -39,6 +40,8 @@ impl<const K: usize, I: Clone + Ord> NonemptyReverseKList<K, I> {
                 }
             });
 
+            // println!("\nremoved: {:#?}\n", removed);
+
             // Next, we move the remaining items of the current vertex to the front.
             let mut new_data: [_; K] = std::array::from_fn(|i| {
                 if i + n < K {
@@ -48,32 +51,46 @@ impl<const K: usize, I: Clone + Ord> NonemptyReverseKList<K, I> {
                 }
             });
 
+            // println!("\nnew_data: {:#?}\n", new_data);
+
             match self.next {
                 None => {
                     // If we are the last vertex, we are done.
                     return (
                         removed,
-                        Some(NonemptyReverseKList {
-                            data: new_data,
-                            next: None,
-                        }),
+                        match new_data[0] {
+                            None => None,
+                            Some(_) => Some(NonemptyReverseKList {
+                                data: new_data,
+                                next: None,
+                            }),
+                        },
                     );
                 }
                 Some(ref next) => {
                     // Recurse on the remaining vertices.
                     let (removed_rec, remaining_rec) = next.remove_n_max(n);
 
+                    // println!("\nnew_data before: {:#?}\n", new_data);
+                    // println!("\nremoved_rec: {:#?}\n", removed_rec);
+
                     // Copy the recursively removed items into the new data for this vertex.
                     for i in 0..n {
-                        new_data[n + i] = removed_rec[i].clone();
+                        // println!("i {} n {} K {}", i, n, K);
+                        new_data[(K - n) + i] = removed_rec[i].clone();
                     }
+
+                    // println!("\nnew_data again: {:#?}\n", new_data);
 
                     return (
                         removed,
-                        Some(NonemptyReverseKList {
-                            data: new_data,
-                            next: remaining_rec.map(Rc::new),
-                        }),
+                        match new_data[0] {
+                            None => None,
+                            Some(_) => Some(NonemptyReverseKList {
+                                data: new_data,
+                                next: remaining_rec.map(Rc::new),
+                            }),
+                        },
                     );
                 }
             }
@@ -93,7 +110,7 @@ impl<const K: usize, I: Clone + Ord> NonemptyReverseKList<K, I> {
     }
 }
 
-impl<const K: usize, I: Clone + Ord> NonemptySet for NonemptyReverseKList<K, I> {
+impl<const K: usize, I: Clone + Ord + Debug> NonemptySet for NonemptyReverseKList<K, I> {
     type Item = I;
 
     fn singleton(item: (Self::Item, GTree<Self>)) -> Self {
@@ -154,7 +171,7 @@ impl<const K: usize, I: Clone + Ord> NonemptySet for NonemptyReverseKList<K, I> 
             }
             None => {
                 // self is the final vertex, remove from the last occupied slot.
-                for i in K-1..=0 {
+                for i in (0..K).rev() {
                     if let Some(ref min) = self.data[i] {
                         // Found the last occupied slot (there is always at least one); remove and return.
                         if i == 0 {
@@ -194,6 +211,7 @@ impl<const K: usize, I: Clone + Ord> NonemptySet for NonemptyReverseKList<K, I> 
         }) {
             Ok(i) => {
                 // We contain the key at index i.
+                // println!("i: {:?}", i);
 
                 // First, we compute the right return.
                 let right = if i == 0 {
@@ -209,13 +227,19 @@ impl<const K: usize, I: Clone + Ord> NonemptySet for NonemptyReverseKList<K, I> 
                         }
                     });
                     Set::NonEmpty(NonemptyReverseKList {
-                        data: right_data,
+                        data: right_data, // safe to do this, i > 0, so right_data is not empty
                         next: None,
                     })
                 };
 
+                // println!("a {:?}", self);
                 // We obtain the left return by removing our first `i` items.
-                let (_, left) = self.remove_n_max(i);
+                let left = if i == 0 {
+                    None
+                } else {
+                    self.remove_n_max(i).1
+                };
+                // let (_, left) = if i == 0 { (None) } else { self.remove_n_max(i) };
 
                 return (
                     match left {
@@ -252,8 +276,7 @@ impl<const K: usize, I: Clone + Ord> NonemptySet for NonemptyReverseKList<K, I> 
                         }
                     }
                 } else {
-                    // i is less than K, so we contain i items greater than the key,
-                    // and at least one item less than the key.
+                    // i is less than K, so we contain i items greater than the key.
 
                     // First, we compute the right return.
                     let right = if i == 0 {
@@ -274,6 +297,7 @@ impl<const K: usize, I: Clone + Ord> NonemptySet for NonemptyReverseKList<K, I> 
                         })
                     };
 
+                    // println!("b {:?}", self);
                     // We obtain the left return by removing our first `i` items.
                     let (_, left) = self.remove_n_max(i);
 
@@ -291,47 +315,54 @@ impl<const K: usize, I: Clone + Ord> NonemptySet for NonemptyReverseKList<K, I> 
     }
 
     fn join(left: &Self, right: &Self) -> Self {
-        match left.next {
-            Some(ref left_next) => {
-                // Recurse and use the return value as the next vertex for the first vertex of `left`.
+        // We need to *prepend* right to left, because we store things in reverse order.
+        match right.next {
+            Some(ref right_next) => {
+                // Recurse and use the return value as the next vertex for the first vertex of `right`.
                 return NonemptyReverseKList {
-                    data: left.data.clone(),
-                    next: Some(Rc::new(Self::join(left_next, right))),
+                    data: right.data.clone(),
+                    next: Some(Rc::new(Self::join(left, right_next))),
                 };
             }
             None => {
                 // Actually need to do some work now.
 
-                // How many items does `left` store?
-                let mut left_count = 0;
+                // How many items does `right` store?
+                let mut right_count = 0;
                 for i in 0..K {
-                    match left.data[i] {
-                        Some(_) => left_count += 1,
+                    match right.data[i] {
+                        Some(_) => right_count += 1,
                         None => break,
                     }
                 }
 
-                if left_count == K {
-                    // Left is full, so we can simply set left.next to right.
+                // println!("right count {}", right_count);
+
+                if right_count == K {
+                    // Right is full, so we can simply set right.next to left.
                     return NonemptyReverseKList {
-                        data: left.data.clone(),
-                        next: Some(Rc::new(right.clone())),
+                        data: right.data.clone(),
+                        next: Some(Rc::new(left.clone())),
                     };
                 } else {
-                    // Left has K - left_count free slots, so move that many items from right into left, and then concatenate.
-                    let to_move = K - left_count;
-                    let (right_removed, right_remaining) = right.remove_n_max(to_move);
+                    // Right has K - right_count free slots, so move that many items from left into right, and then concatenate.
+                    let to_move = K - (right_count);
+                    let (left_removed, left_remaining) = left.remove_n_max(to_move);
+                    // println!("to_move {}, left_removed {:?}", to_move, left_removed);
                     let new_data: [_; K] = std::array::from_fn(|i| {
-                        if i < left_count {
-                            return left.data[i].clone();
+                        if i < right_count {
+                            return right.data[i].clone();
                         } else {
-                            return right_removed[i - left_count].clone();
+                            return left_removed[i - right_count].clone();
                         }
                     });
+
+                    // println!("new_data {:?}", new_data);
+                    // println!("left_remaining {:?}", left_remaining);
                     
                     return NonemptyReverseKList {
                         data: new_data,
-                        next: right_remaining.map(|r| Rc::new(r)),
+                        next: left_remaining.map(|l| Rc::new(l)),
                     };
                 }
             }
@@ -339,7 +370,7 @@ impl<const K: usize, I: Clone + Ord> NonemptySet for NonemptyReverseKList<K, I> 
     }
 }
 
-impl<const K: usize, I: Clone + Ord> NonemptySetMeta for NonemptyReverseKList<K, I> {
+impl<const K: usize, I: Clone + Ord + Debug> NonemptySetMeta for NonemptyReverseKList<K, I> {
     /// Return a reference to the maximal item in the set.
     fn get_max(&self) -> &Self::Item {
         match self.data[0] {
@@ -355,7 +386,7 @@ impl<const K: usize, I: Clone + Ord> NonemptySetMeta for NonemptyReverseKList<K,
                 return next.get_min();
             }
             None => {
-                for i in K-1..=0 {
+                for i in (0..K).rev() {
                     if let Some((ref item, _)) = self.data[i] {
                         return &item;
                     }
@@ -371,11 +402,12 @@ impl<const K: usize, I: Clone + Ord> NonemptySetMeta for NonemptyReverseKList<K,
                 return K + next.len();
             }
             None => {
-                for i in 0..K {
+                for i in (0..K).rev() {
                     if let Some(_) = self.data[i] {
-                        return i;
+                        return i + 1;
                     }
                 }
+                println!("{:?}", self);
                 unreachable!("self.data contains at least one item.");
             }
         }
@@ -383,5 +415,19 @@ impl<const K: usize, I: Clone + Ord> NonemptySetMeta for NonemptyReverseKList<K,
 
     fn get_by_index(&self, index: usize) -> Option<&Self::Item> {
         return self.get_by_inverted_index(self.len() - (1 + index));
+    }
+
+    fn from_descending(items: &[Self::Item]) -> Self {
+        let mut ret = Self::singleton((items[0].clone(), GTree::Empty));
+
+        if items.len() == 1 {
+            return ret;
+        }
+
+        for i in 1..items.len() {
+            ret = ret.insert_min((items[i].clone(), GTree::Empty))
+        }
+
+        return ret;
     }
 }

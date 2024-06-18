@@ -11,7 +11,7 @@ use arbitrary::{Arbitrary};
 /*
 Definitions for NonemptySet and GTrees.
 */
-
+#[derive(Debug, Clone)]
 pub enum Set<S> {
     NonEmpty(S),
     Empty,
@@ -39,14 +39,14 @@ where
     fn insert_min(&self, new_min: (Self::Item, GTree<Self>)) -> Self;
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct GTreeNode<S: NonemptySet> {
     set: S,
     right: GTree<S>,
     rank: u8,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum GTree<S: NonemptySet> {
     NonEmpty(Rc<GTreeNode<S>>),
     Empty,
@@ -187,7 +187,7 @@ pub fn delete<S: NonemptySet>(
 }
 
 /// Additional methods for NonemptySets, to allow for testing and statistics gathering.
-pub trait NonemptySetMeta: NonemptySet
+pub trait NonemptySetMeta: NonemptySet + Debug
 where
     Self: Sized,
 {
@@ -199,22 +199,30 @@ where
     fn len(&self) -> usize;
     // Get an item by index, where index 0 denotes the least item.
     fn get_by_index(&self, index: usize) -> Option<&Self::Item>;
+    // Create an instance from a non-empty slice of strictly descending items (use empty trees as the left subtrees).
+    fn from_descending(items: &[Self::Item]) -> Self;
 }
 
 pub fn sets_assert_eq<I: Debug + Eq, S1: NonemptySetMeta<Item = I>, S2: NonemptySetMeta<Item = I>>(s1: &S1, s2: &S2) {
-    let len = s1.len();
-    assert_eq!(len, s2.len());
+    if s1.len() != s2.len() {
+        println!("{:?}\n\n{:?}", s1, s2);
+        let len = s1.len();
+        assert_eq!(len, s2.len(), "Comparing lengths of the two sets.");
+    }
 
-    for i in 0..len {
-        assert_eq!(s1.get_by_index(i), s2.get_by_index(i));
+    for i in 0..s1.len() {
+        if s1.get_by_index(i) != s2.get_by_index(i) {
+            println!("\n\n{:#?}\n\n{:?}\n\n", s1, s2);
+            assert_eq!(s1.get_by_index(i), s2.get_by_index(i));
+        }
     }
 }
 
 /*
 Implementation of NonemptySet for a sorted (in descending order) Vec for testing purposes.
 */
-#[derive(Clone)]
-pub struct ControlSet<I: Clone + Ord>(Vec<(I, GTree<Self>)>);
+#[derive(Debug, Clone)]
+pub struct ControlSet<I: Clone + Ord>(pub Vec<(I, GTree<Self>)>);
 
 impl<I: Clone + Ord> NonemptySet for ControlSet<I> {
     type Item = I;
@@ -232,7 +240,7 @@ impl<I: Clone + Ord> NonemptySet for ControlSet<I> {
     fn remove_min(&self) -> ((Self::Item, GTree<Self>), Set<Self>) {
         let mut ret = self.clone();
         let popped = ret.0.pop().unwrap();
-        return (popped, Set::NonEmpty(ret));
+        return (popped, if ret.0.len() == 0 { Set::Empty } else { Set::NonEmpty(ret) });
     }
 
     fn split(&self, key: &Self::Item) -> (Set<Self>, Option<GTree<Self>> /* left subtree of key (if key is in self, else None) */, Set<Self>) {
@@ -242,12 +250,20 @@ impl<I: Clone + Ord> NonemptySet for ControlSet<I> {
             Ok(i) => {
                 let right = self.0[0..i].to_vec();
                 let left = self.0[i+1..].to_vec();
-                return (Set::NonEmpty(ControlSet(left)), Some(self.0[i].1.clone()), Set::NonEmpty(ControlSet(right)));
+                return (
+                    if left.len() == 0 { Set::Empty } else { Set::NonEmpty(ControlSet(left)) },
+                    Some(self.0[i].1.clone()),
+                    if right.len() == 0 { Set::Empty } else { Set::NonEmpty(ControlSet(right)) },
+                );
             }
             Err(i) => {
                 let right = self.0[0..i].to_vec();
                 let left = self.0[i..].to_vec();
-                return (Set::NonEmpty(ControlSet(left)), None, Set::NonEmpty(ControlSet(right)));
+                return (
+                    if left.len() == 0 { Set::Empty } else { Set::NonEmpty(ControlSet(left)) },
+                    None,
+                    if right.len() == 0 { Set::Empty } else { Set::NonEmpty(ControlSet(right)) },
+                );
             }
         }
     }
@@ -259,7 +275,7 @@ impl<I: Clone + Ord> NonemptySet for ControlSet<I> {
     }
 }
 
-impl<I: Clone + Ord> NonemptySetMeta for ControlSet<I> {
+impl<I: Clone + Ord + Debug> NonemptySetMeta for ControlSet<I> {
     /// Return a reference to the maximal item in the set.
     fn get_max(&self) -> &Self::Item {
         return &self.0[0].0;
@@ -277,19 +293,33 @@ impl<I: Clone + Ord> NonemptySetMeta for ControlSet<I> {
     fn get_by_index(&self, index: usize) -> Option<&Self::Item> {
         return self.0.get(self.0.len() - (index + 1)).map(|(item, _)| item);
     }
+
+    fn from_descending(items: &[Self::Item]) -> Self {
+        let mut ret = Self::singleton((items[0].clone(), GTree::Empty));
+
+        if items.len() == 1 {
+            return ret;
+        }
+
+        for i in 1..items.len() {
+            ret = ret.insert_min((items[i].clone(), GTree::Empty))
+        }
+
+        return ret;
+    }
 }
 
 // Operations for constructing random sets. The subtrees in those sets are always empty.
-// #[derive(Debug, PartialEq, Eq, Arbitrary, Clone)]
+#[derive(Debug, Arbitrary, Clone)]
 pub enum SetCreationOperation<Item> {
     Singleton(Item),
-    RemoveMin(Box<Self>),
     InsertMin(Box<Self>, Item),
+    RemoveMin(Box<Self>),
     // Split and choose the left return value.
-    SplitLeft(Box<Self>, Item),
-    // Split and choose the right return value.
-    SplitRight(Box<Self>, Item),
-    Join(Box<Self>, Box<Self>),
+    // SplitLeft(Box<Self>, Item),
+    // // Split and choose the right return value.
+    // SplitRight(Box<Self>, Item),
+    // Join(Box<Self>, Box<Self>),
 }
 
 // Try to create a set. Return None if a creation operation is invalid (ading a non-minimal item or joining non-disjoint ordered sets).
@@ -297,17 +327,6 @@ pub fn create_set<Item: Clone + Ord, S: NonemptySetMeta<Item = Item>>(creation: 
     match creation {
         SetCreationOperation::Singleton(item) => {
             return Some(Set::NonEmpty(S::singleton((item, GTree::Empty))));
-        }
-        SetCreationOperation::RemoveMin(creation_rec) => {
-            match create_set::<_, S>(*creation_rec) {
-                None => None,
-                Some(set_rec) => {
-                    match set_rec {
-                        Set::Empty => return Some(Set::Empty),
-                        Set::NonEmpty(neset_rec) => return Some(neset_rec.remove_min().1),
-                    }
-                }
-            }
         }
         SetCreationOperation::InsertMin(creation_rec, item) => {
             match create_set::<_, S>(*creation_rec) {
@@ -326,51 +345,62 @@ pub fn create_set<Item: Clone + Ord, S: NonemptySetMeta<Item = Item>>(creation: 
                 }
             }
         }
-        SetCreationOperation::SplitLeft(creation_rec, item) => {
+        SetCreationOperation::RemoveMin(creation_rec) => {
             match create_set::<_, S>(*creation_rec) {
                 None => None,
                 Some(set_rec) => {
                     match set_rec {
                         Set::Empty => return Some(Set::Empty),
-                        Set::NonEmpty(neset_rec) => {
-                            return Some(neset_rec.split(&item).0);
-                        }
+                        Set::NonEmpty(neset_rec) => return Some(neset_rec.remove_min().1),
                     }
                 }
             }
         }
-        SetCreationOperation::SplitRight(creation_rec, item) => {
-            match create_set::<_, S>(*creation_rec) {
-                None => None,
-                Some(set_rec) => {
-                    match set_rec {
-                        Set::Empty => return Some(Set::Empty),
-                        Set::NonEmpty(neset_rec) => {
-                            return Some(neset_rec.split(&item).2);
-                        }
-                    }
-                }
-            }
-        }
-        SetCreationOperation::Join(left_creation_rec, right_creation_rec) => {
-            match (create_set::<_, S>(*left_creation_rec), create_set::<_, S>(*right_creation_rec)) {
-                (Some(left_set_rec), Some(right_set_rec)) => {
-                    match (left_set_rec, right_set_rec) {
-                        (Set::Empty, Set::Empty) => return Some(Set::Empty),
-                        (Set::NonEmpty(left), Set::Empty) => return Some(Set::NonEmpty(left)),
-                        (Set::Empty, Set::NonEmpty(right)) => return Some(Set::NonEmpty(right)),
-                        (Set::NonEmpty(left), Set::NonEmpty(right)) => {
-                            if left.get_max() < right.get_min() {
-                                return Some(Set::NonEmpty(NonemptySet::join(&left, &right)));
-                            } else {
-                                return None;
-                            }
-                        }
-                    }
-                }
-                _=> return None,
-            }
-        }
+        // SetCreationOperation::SplitLeft(creation_rec, item) => {
+        //     match create_set::<_, S>(*creation_rec) {
+        //         None => None,
+        //         Some(set_rec) => {
+        //             match set_rec {
+        //                 Set::Empty => return Some(Set::Empty),
+        //                 Set::NonEmpty(neset_rec) => {
+        //                     return Some(neset_rec.split(&item).0);
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+        // SetCreationOperation::SplitRight(creation_rec, item) => {
+        //     match create_set::<_, S>(*creation_rec) {
+        //         None => None,
+        //         Some(set_rec) => {
+        //             match set_rec {
+        //                 Set::Empty => return Some(Set::Empty),
+        //                 Set::NonEmpty(neset_rec) => {
+        //                     return Some(neset_rec.split(&item).2);
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+        // SetCreationOperation::Join(left_creation_rec, right_creation_rec) => {
+        //     match (create_set::<_, S>(*left_creation_rec), create_set::<_, S>(*right_creation_rec)) {
+        //         (Some(left_set_rec), Some(right_set_rec)) => {
+        //             match (left_set_rec, right_set_rec) {
+        //                 (Set::Empty, Set::Empty) => return Some(Set::Empty),
+        //                 (Set::NonEmpty(left), Set::Empty) => return Some(Set::NonEmpty(left)),
+        //                 (Set::Empty, Set::NonEmpty(right)) => return Some(Set::NonEmpty(right)),
+        //                 (Set::NonEmpty(left), Set::NonEmpty(right)) => {
+        //                     if left.get_max() < right.get_min() {
+        //                         return Some(Set::NonEmpty(NonemptySet::join(&left, &right)));
+        //                     } else {
+        //                         return None;
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //         _=> return None,
+        //     }
+        // }
     }
 }
 
