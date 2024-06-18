@@ -37,6 +37,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "search"
+path = "fuzz_targets/search.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "gtree"
 path = "fuzz_targets/gtree.rs"
 test = false

@@ -3,7 +3,7 @@
 
 pub mod klist;
 
-use std::rc::Rc;
+use std::{collections::BTreeSet, rc::Rc};
 use std::fmt::Debug;
 
 use arbitrary::{Arbitrary};
@@ -37,6 +37,8 @@ where
     fn join(left: &Self, right: &Self) -> Self;
     fn remove_min(&self) -> ((Self::Item, GTree<Self>), Set<Self>);
     fn insert_min(&self, new_min: (Self::Item, GTree<Self>)) -> Self;
+    /// Return the item-left_subtree pair witht the least item that is greater than or equal to `key`. Return None if no such pair exists.
+    fn search(&self, key: &Self::Item) -> Option<(Self::Item, GTree<Self>)>;
 }
 
 #[derive(Debug, Clone)]
@@ -285,6 +287,21 @@ impl<I: Clone + Ord> NonemptySet for ControlSet<I> {
         new.0.extend_from_slice(&left.0[..]);
         return new;
     }
+    
+    fn search(&self, key: &Self::Item) -> Option<(Self::Item, GTree<Self>)> {
+        match self.0.binary_search_by(|x| key.cmp(&x.0)) {
+            Ok(i) => {
+                return Some(self.0[i].clone());
+            }
+            Err(i) => {
+                if i == 0 {
+                    return None;
+                } else {
+                    return Some(self.0[i - 1].clone());
+                }
+            }
+        }
+    }
 }
 
 impl<I: Clone + Ord + Debug> NonemptySetMeta for ControlSet<I> {
@@ -418,16 +435,15 @@ pub fn create_set<Item: Clone + Ord, S: NonemptySetMeta<Item = Item>>(creation: 
 
 
 
-
+#[derive(Debug, Arbitrary, Clone)]
 pub enum TreeCreation<Item> {
     Empty,
     Insert(Box<Self>, Item, u8),
     Remove(Box<Self>, Item),
 }
 
-
 // Create a tree according to a TreeDescription value.
-pub fn create_tree<Item: Clone + Ord, S: NonemptySet<Item = Item>>(creation: TreeCreation<Item>) -> GTree<S>{
+pub fn create_tree<Item: Clone + Ord, S: NonemptySet<Item = Item>>(creation: TreeCreation<Item>) -> GTree<S> {
     match creation {
         TreeCreation::Empty => return GTree::Empty,
         TreeCreation::Insert(creation_rec, item, rank) => {
@@ -439,6 +455,22 @@ pub fn create_tree<Item: Clone + Ord, S: NonemptySet<Item = Item>>(creation: Tre
             let tree_rec = create_tree(*creation_rec);
             let new_tree = delete(&tree_rec, item.clone());
             return new_tree;
+        }
+    }
+}
+
+pub fn create_ctrl_tree<Item: Clone + Ord>(creation: TreeCreation<Item>) -> BTreeSet<Item> {
+    match creation {
+        TreeCreation::Empty => return BTreeSet::new(),
+        TreeCreation::Insert(creation_rec, item, _rank) => {
+            let mut tree_rec = create_ctrl_tree(*creation_rec);
+            tree_rec.insert(item);
+            return tree_rec;
+        }
+        TreeCreation::Remove(creation_rec, item) => {
+            let mut tree_rec = create_ctrl_tree(*creation_rec);
+            tree_rec.remove(&item);
+            return tree_rec;
         }
     }
 }

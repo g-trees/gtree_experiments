@@ -380,6 +380,40 @@ impl<const K: usize, I: Clone + Ord + Debug> NonemptySet for NonemptyReverseKLis
             }
         }
     }
+    
+    fn search(&self, key: &Self::Item) -> Option<(Self::Item, GTree<Self>)> {
+        match self.data.binary_search_by(|opt| {
+            match opt {
+                // The `None`s are toward the end of the array, so `None`
+                // must compare as greater than any item.
+                None => return Ordering::Greater,
+                // We compare the key with the stored item instead of the
+                // other way round, to account for the reverse order.
+                Some((my_item, _)) => return key.cmp(my_item),
+            }
+        }) {
+            Ok(i) => {
+                return self.data[i].clone();
+            }
+            Err(i) => {
+                if i == 0 {
+                    return None;
+                } else if i == K {
+                    match self.next {
+                        None => return self.data[i - 1].clone(),
+                        Some(ref next) => {
+                            match next.search(key) {
+                                None => return self.data[K - 1].clone(),
+                                Some(yay) => return Some(yay),
+                            }
+                        }
+                    }
+                } else {
+                    return self.data[i - 1].clone();
+                }
+            }
+        }
+    }
 }
 
 impl<const K: usize, I: Clone + Ord + Debug> NonemptySetMeta for NonemptyReverseKList<K, I> {
