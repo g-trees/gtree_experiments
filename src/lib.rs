@@ -85,7 +85,7 @@ fn lift<S: NonemptySet>(s: &Set<S>, right: GTree<S>, rank: u8) -> GTree<S> {
     };
 }
 
-pub fn unzip<S: NonemptySet>(
+pub fn unzip<S: NonemptySet + Debug>(
     t: &GTree<S>,
     key: &S::Item,
 ) -> (GTree<S>, GTree<S>) {
@@ -112,12 +112,30 @@ pub fn unzip<S: NonemptySet>(
             }
 
             (left_set, None, Set::NonEmpty(r)) => {
+                // println!("just_split {:#?}\n{:#?}", left_set, r);
                 // If the current node does not contain the split point, but it does contain items greater than the split point, we need to split in the leftmost child of those greater items.
-                let ((_, r_leftmost_subtree), _) = r.remove_min();
+                let ((r_leftmost_item, r_leftmost_subtree), r_remaining) = r.remove_min();
                 let (left, right) = unzip(&r_leftmost_subtree, key);
+                // println!("recursive unzip {:#?}\n{:#?}", left, right);
+                // println!("split returning\n{:#?}\n{:#?}", lift(&left_set, left.clone(), s.rank), GTree::NonEmpty(update_leftmost(s, right.clone())));
+                // return (
+                //     lift(&left_set, left.clone(), s.rank),
+                //     GTree::NonEmpty(update_leftmost(s, right)),
+                // );
+                let right_return = GTree::NonEmpty(Rc::new(GTreeNode {
+                    rank: s.rank,
+                    set: r_remaining.insert_min((r_leftmost_item, right)),
+                    right: s.right.clone(),
+                }));
+                // let right_return = GTree::NonEmpty(update_leftmost(&GTreeNode {
+                //     set: r,
+                //     rank: s.rank,
+                //     right: s.right.clone(),
+                // }, right));
+                // println!("split returning\n{:#?}\n{:#?}", lift(&left_set, left.clone(), s.rank), right_return);
                 return (
                     lift(&left_set, left.clone(), s.rank),
-                    GTree::NonEmpty(update_leftmost(s, right)),
+                    right_return,
                 );
             }
         },
@@ -171,21 +189,46 @@ pub fn zip3<S: NonemptySet>(
     return zip2(&zip2(&left, &mid), &right);
 }
 
-pub fn insert<S: NonemptySet>(
+pub fn insert<S: NonemptySet + Debug>(
     t: &GTree<S>,
     item: S::Item,
     rank: u8,
 ) -> GTree<S> {
+    // println!("inserting into {:#?}\n", t);
     let (left, right) = unzip(t, &item);
-    return zip3(&left, item, rank, &right);
+    // println!("a unzipped {:#?}\n{:#?}", left, right);
+    let zipped = zip3(&left, item, rank, &right);
+    // println!("zipped {:#?}\n\n\n\n", zipped);
+    return zipped;
 }
 
-pub fn delete<S: NonemptySet>(
+pub fn delete<S: NonemptySet + Debug>(
     t: &GTree<S>,
-    item: S::Item,
+    item: &S::Item,
 ) -> GTree<S> {
-    let (left, right) = unzip(t, &item);
+    let (left, right) = unzip(t, item);
     return zip2(&left, &right);
+}
+
+pub fn has<S: NonemptySet>(
+    t: &GTree<S>,
+    key: &S::Item,
+) -> bool where S::Item: Ord {
+    match t {
+        GTree::Empty => return false,
+        GTree::NonEmpty(node) => {
+            match node.set.search(key) {
+                None => return has(&node.right, key),
+                Some(yay) => {
+                    if &yay.0 == key {
+                        return true;
+                    } else {
+                        return has(&yay.1, key);
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Additional methods for NonemptySets, to allow for testing and statistics gathering.
@@ -443,7 +486,7 @@ pub enum TreeCreation<Item> {
 }
 
 // Create a tree according to a TreeDescription value.
-pub fn create_tree<Item: Clone + Ord, S: NonemptySet<Item = Item>>(creation: TreeCreation<Item>) -> GTree<S> {
+pub fn create_tree<Item: Clone + Ord, S: NonemptySet<Item = Item> + Debug>(creation: TreeCreation<Item>) -> GTree<S> {
     match creation {
         TreeCreation::Empty => return GTree::Empty,
         TreeCreation::Insert(creation_rec, item, rank) => {
@@ -453,7 +496,7 @@ pub fn create_tree<Item: Clone + Ord, S: NonemptySet<Item = Item>>(creation: Tre
         }
         TreeCreation::Remove(creation_rec, item) => {
             let tree_rec = create_tree(*creation_rec);
-            let new_tree = delete(&tree_rec, item.clone());
+            let new_tree = delete(&tree_rec, &item);
             return new_tree;
         }
     }

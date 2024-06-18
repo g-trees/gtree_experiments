@@ -4,22 +4,18 @@ use libfuzzer_sys::fuzz_target;
 use gtree_experiments::{*, klist::*};
 
 fuzz_target!(|data: TreeCreation<u8>| {
-    let gtree: GTree<NonemptyReverseKList<3, u8>> = create_tree(data);
+    let gtree: GTree<NonemptyReverseKList<3, u8>> = create_tree(data.clone());
+    // let gtree: GTree<ControlSet<u8>> = create_tree(data.clone());
+    let ctrl = create_ctrl_tree(data);
 
-    // let ctrl: Option<Set<ControlSet<u8>>> = create_set(data.clone());
-    // if let Some(ctrl) = ctrl {
-    //     let klist: Set<NonemptyReverseKList<3, u8>> = create_set(data.clone()).unwrap();
+    for i in 0..=255 {
+        let has_gtree = has(&gtree, &i);
+        let has_ctrl = ctrl.contains(&i);
 
-    //     match (ctrl, klist) {
-    //         (Set::Empty, Set::Empty) => {/* no-op, all good */}
-    //         (Set::NonEmpty(ctrl), Set::NonEmpty(klist)) => {
-    //             sets_assert_eq(&klist, &ctrl);
-    //         }
-    //         (ctrl, klist) => {
-    //             println!("klist: {:?}", klist);
-    //             println!("ctrl:  {:?}", ctrl);
-    //             panic!("Nonequal klist and control.");
-    //         }
-    //     }        
-    // }
+        if has_gtree != has_ctrl {
+            println!("\n\nDifferent search results, searching for {:?}.\n{:#?}\n{:#?}", i, gtree, ctrl);
+        }
+
+        assert_eq!(has_gtree, has_ctrl);
+    }
 });
