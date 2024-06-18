@@ -211,7 +211,7 @@ impl<const K: usize, I: Clone + Ord + Debug> NonemptySet for NonemptyReverseKLis
         }) {
             Ok(i) => {
                 // We contain the key at index i.
-                // println!("i: {:?}", i);
+                // println!("Ok i: {:?}", i);
 
                 // First, we compute the right return.
                 let right = if i == 0 {
@@ -231,14 +231,11 @@ impl<const K: usize, I: Clone + Ord + Debug> NonemptySet for NonemptyReverseKLis
                         next: None,
                     })
                 };
+                // println!("right {:#?}", right);
 
                 // println!("a {:?}", self);
-                // We obtain the left return by removing our first `i` items.
-                let left = if i == 0 {
-                    None
-                } else {
-                    self.remove_n_max(i).1
-                };
+                // We obtain the left return by removing our first `i + 1` items.
+                let left = self.remove_n_max(i + 1).1;
                 // let (_, left) = if i == 0 { (None) } else { self.remove_n_max(i) };
 
                 return (
@@ -252,8 +249,12 @@ impl<const K: usize, I: Clone + Ord + Debug> NonemptySet for NonemptyReverseKLis
             }
             Err(i) => {
                 // We do not contain the key.
+                // println!("Err i: {:?}", i);
 
-                if i == K {
+                if i == 0 {
+                    // We (and the whole list) contain only items less than the key.
+                    return (Set::NonEmpty(self.clone()), None, Set::Empty);
+                } else if i == K {
                     // We contain no item less than the key.
 
                     match self.next {
@@ -262,16 +263,29 @@ impl<const K: usize, I: Clone + Ord + Debug> NonemptySet for NonemptyReverseKLis
                             return (Set::Empty, None, Set::NonEmpty(self.clone()));
                         }
                         Some(ref next) => {
-                            // Recurse and join ourselves to the right of the right recursive return.
-                            let (right_rec, mid_rec, left_rec) = next.split(key);
+                            // Recurse and append the right recursive return to ourselves.
+                            let (left_rec, mid_rec, right_rec) = next.split(key);
+                            // println!("recursive:\n{:#?}\n{:?}\n{:#?}", left_rec, mid_rec, right_rec);
 
                             match right_rec {
-                                Set::Empty => return (left_rec, mid_rec, Set::NonEmpty(self.clone())),
-                                Set::NonEmpty(right_rec) => return (
-                                    left_rec,
-                                    mid_rec,
-                                    Set::NonEmpty(Self::join(self, &right_rec)),
-                                ),
+                                Set::Empty => {
+                                    let mut cloned = self.clone();
+                                    cloned.next = None;
+                                    return (
+                                        left_rec,
+                                        mid_rec,
+                                        Set::NonEmpty(cloned),
+                                    );
+                                }
+                                Set::NonEmpty(right_rec) => {
+                                    let mut cloned = self.clone();
+                                    cloned.next = Some(Rc::new(right_rec));
+                                    return (
+                                        left_rec,
+                                        mid_rec,
+                                        Set::NonEmpty(cloned),
+                                    );
+                                }
                             }
                         }
                     }
@@ -279,27 +293,25 @@ impl<const K: usize, I: Clone + Ord + Debug> NonemptySet for NonemptyReverseKLis
                     // i is less than K, so we contain i items greater than the key.
 
                     // First, we compute the right return.
-                    let right = if i == 0 {
-                        // The first item less than the key is the very first item, so the right return is the empty set.
-                        Set::Empty
-                    } else {
-                        // The right return contains all the items up to but excluding index i.
-                        let right_data = std::array::from_fn(|j| {
-                            if j < i {
-                                return self.data[j].clone();
-                            } else {
-                                return None;
-                            }
-                        });
-                        Set::NonEmpty(NonemptyReverseKList {
-                            data: right_data,
-                            next: None,
-                        })
-                    };
+                    // The right return contains all the items up to but excluding index i.
+                    let right_data = std::array::from_fn(|j| {
+                        if j < i {
+                            return self.data[j].clone();
+                        } else {
+                            return None;
+                        }
+                    });
+                    // println!("c {:?}", right_data);
+                    let right = Set::NonEmpty(NonemptyReverseKList {
+                        data: right_data,
+                        next: None,
+                    });
 
                     // println!("b {:?}", self);
                     // We obtain the left return by removing our first `i` items.
                     let (_, left) = self.remove_n_max(i);
+                    // println!("d {:?}", left);
+                    // println!("e {:?}", right);
 
                     return (
                         match left {

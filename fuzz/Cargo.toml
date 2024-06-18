@@ -29,3 +29,15 @@ name = "join"
 path = "fuzz_targets/join.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "split"
+path = "fuzz_targets/split.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "gtree"
+path = "fuzz_targets/gtree.rs"
+test = false
+doc = false

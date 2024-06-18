@@ -218,6 +218,18 @@ pub fn sets_assert_eq<I: Debug + Eq, S1: NonemptySetMeta<Item = I>, S2: Nonempty
     }
 }
 
+pub fn possibly_empty_sets_assert_eq<I: Debug + Eq, S1: NonemptySetMeta<Item = I>, S2: NonemptySetMeta<Item = I>>(s1: &Set<S1>, s2: &Set<S2>) {
+    match (s1, s2) {
+        (Set::Empty, Set::Empty) => {
+            // no-op
+        }
+        (Set::NonEmpty(s1), Set::NonEmpty(s2)) => return sets_assert_eq(s1, s2),
+        _ => {
+            panic!("\n\nGot non-equal sets:\n\n{:#?}\n\n{:?}\n\n", s1, s2);
+        }
+    }
+}
+
 /*
 Implementation of NonemptySet for a sorted (in descending order) Vec for testing purposes.
 */
@@ -407,40 +419,26 @@ pub fn create_set<Item: Clone + Ord, S: NonemptySetMeta<Item = Item>>(creation: 
 
 
 
-// pub enum TreeCreation<Item> {
-//     Empty,
-//     Insert(Box<Self>, Item, u8),
-//     Remove(Box<Self>, Item),
-// }
+pub enum TreeCreation<Item> {
+    Empty,
+    Insert(Box<Self>, Item, u8),
+    Remove(Box<Self>, Item),
+}
 
 
-// // Create a tree according to a TreeDescription value, also report its least and greatest item (if it is non-empty).
-// pub fn create_tree<Item: Clone + Ord, S: NonemptySet<Item = Item>>(creation: TreeCreation<Item>) -> (GTree<S>, Option<(Item, Item)>) {
-//     match creation {
-//         TreeCreation::Empty => return (GTree::Empty, None),
-//         TreeCreation::Insert(creation_rec, item, rank) => {
-//             let (tree_rec, extrema_rec) = create_tree(*creation_rec);
-//             let new_tree = insert(&tree_rec, item.clone(), rank);
-
-//             match extrema_rec {
-//                 None => return (new_tree, Some((item.clone(), item.clone()))),
-//                 Some((old_min, old_max)) => return (
-//                     new_tree,
-//                     Some((std::cmp::min(old_min, item.clone()), std::cmp::max(old_max, item.clone()))),
-//                 ),
-//             }
-//         }
-//         TreeCreation::Remove(creation_rec, item) => {
-//             let (tree_rec, extrema_rec) = create_tree(*creation_rec);
-//             let new_tree = delete(&tree_rec, item.clone());
-
-//             match extrema_rec {
-//                 None => return (new_tree, Some((item.clone(), item.clone()))),
-//                 Some((old_min, old_max)) => return (
-//                     new_tree,
-//                     Some((std::cmp::min(old_min, item.clone()), std::cmp::max(old_max, item.clone()))),
-//                 ),
-//             }
-//         }
-//     }
-// }
+// Create a tree according to a TreeDescription value.
+pub fn create_tree<Item: Clone + Ord, S: NonemptySet<Item = Item>>(creation: TreeCreation<Item>) -> GTree<S>{
+    match creation {
+        TreeCreation::Empty => return GTree::Empty,
+        TreeCreation::Insert(creation_rec, item, rank) => {
+            let tree_rec = create_tree(*creation_rec);
+            let new_tree = insert(&tree_rec, item.clone(), rank);
+            return new_tree;
+        }
+        TreeCreation::Remove(creation_rec, item) => {
+            let tree_rec = create_tree(*creation_rec);
+            let new_tree = delete(&tree_rec, item.clone());
+            return new_tree;
+        }
+    }
+}
