@@ -19,7 +19,7 @@ fn create_gtree<S: NonemptySet<Item = u64> + Debug>(items: &[(u64, u8 /*rank*/)]
 
 fn random_gtree_of_size<S: NonemptySet<Item = u64> + Debug>(n: usize, target_node_size: usize) -> GTree<S> {
     let mut items = vec![];
-    let geo = Geometric::new(1.0 - (1.0 / (target_node_size as f64))).unwrap();
+    let geo = Geometric::new(1.0 - (1.0 / ((target_node_size + 1) as f64))).unwrap();
 
     for _ in 0..n {
         let key: u64 = random();
@@ -45,13 +45,35 @@ pub fn bench_search(c: &mut Criterion) {
     // group.measurement_time(Duration::from_secs(150));
 
     // for i in [100, 1000, 10000, 100000].iter() {
-    for i in [10, 100, 1000, 4000].iter() {
+    for i in [100, 1000].iter() {
         group.bench_with_input(
             BenchmarkId::new("Search 1-Zip", i),
             i,
             |b, i| {
                 b.iter_batched_ref(
                     || setup::<NonemptyReverseKList<1, u64>>(*i, 1),
+                    |(tree, key)| has(tree, key),
+                    BatchSize::SmallInput,
+                )
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("Search 2-Zip", i),
+            i,
+            |b, i| {
+                b.iter_batched_ref(
+                    || setup::<NonemptyReverseKList<2, u64>>(*i, 2),
+                    |(tree, key)| has(tree, key),
+                    BatchSize::SmallInput,
+                )
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("Search 4-Zip", i),
+            i,
+            |b, i| {
+                b.iter_batched_ref(
+                    || setup::<NonemptyReverseKList<4, u64>>(*i, 4),
                     |(tree, key)| has(tree, key),
                     BatchSize::SmallInput,
                 )
@@ -96,6 +118,50 @@ pub fn bench_search(c: &mut Criterion) {
             |b, i| {
                 b.iter_batched_ref(
                     || setup::<NonemptyReverseKList<64, u64>>(*i, 64),
+                    |(tree, key)| has(tree, key),
+                    BatchSize::SmallInput,
+                )
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("Search 128-Zip", i),
+            i,
+            |b, i| {
+                b.iter_batched_ref(
+                    || setup::<NonemptyReverseKList<128, u64>>(*i, 128),
+                    |(tree, key)| has(tree, key),
+                    BatchSize::SmallInput,
+                )
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("Search 256-Zip", i),
+            i,
+            |b, i| {
+                b.iter_batched_ref(
+                    || setup::<NonemptyReverseKList<256, u64>>(*i, 256),
+                    |(tree, key)| has(tree, key),
+                    BatchSize::SmallInput,
+                )
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("Search 512-Zip", i),
+            i,
+            |b, i| {
+                b.iter_batched_ref(
+                    || setup::<NonemptyReverseKList<512, u64>>(*i, 512),
+                    |(tree, key)| has(tree, key),
+                    BatchSize::SmallInput,
+                )
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("Search 1024-Zip", i),
+            i,
+            |b, i| {
+                b.iter_batched_ref(
+                    || setup::<NonemptyReverseKList<1024, u64>>(*i, 1024),
                     |(tree, key)| has(tree, key),
                     BatchSize::SmallInput,
                 )
