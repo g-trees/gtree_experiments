@@ -3,6 +3,7 @@
 
 pub mod klist;
 
+use std::collections::BTreeMap;
 use std::{collections::BTreeSet, rc::Rc};
 use std::fmt::Debug;
 
@@ -242,10 +243,188 @@ where
     fn get_min(&self) -> &Self::Item;
     /// Get the number of items in the set.
     fn len(&self) -> usize;
+    // Get an item and its left subtree by index, where index 0 denotes the least item.
+    fn get_pair_by_index(&self, index: usize) -> Option<&(Self::Item, GTree<Self>)>;
     // Get an item by index, where index 0 denotes the least item.
-    fn get_by_index(&self, index: usize) -> Option<&Self::Item>;
+    fn get_by_index(&self, index: usize) -> Option<&Self::Item> {
+        return self.get_pair_by_index(index).map(|(item, _)| item);
+    }
     // Create an instance from a non-empty slice of strictly descending items (use empty trees as the left subtrees).
     fn from_descending(items: &[Self::Item]) -> Self;
+    // Total number of items this could store without allocating more memory. Used to compute space amplification.
+    fn item_slot_count(&self) -> usize;
+}
+
+// Return a vec of item-left_subtree pairs in descending order.
+fn pairs_ascending<S: NonemptySetMeta>(s: &S) -> Vec<&(S::Item, GTree<S>)> where S::Item: Ord {
+    let mut ret  = vec![];
+
+    for i in 0..s.len() {
+        let pair = s.get_pair_by_index(i).unwrap();
+        ret.push(pair);
+    }
+
+    ret.sort_by(|(item_a, _), (item_b, _)| item_a.cmp(item_b));
+    return ret;
+}
+
+#[derive(Clone, Debug)]
+pub struct Stats<Item> {
+    pub gnode_height: usize, // empty tree has height 0
+    pub gnode_count: usize,
+    pub item_count: usize,
+    pub item_slot_count: usize,
+    pub rank: i16,
+    pub is_heap: bool,
+    pub least_item: Option<Item>,
+    pub greatest_item: Option<Item>,
+    pub is_search_tree: bool,
+}
+
+pub fn gtree_stats<S: NonemptySetMeta>(
+    t: &GTree<S>,
+) -> (Stats<S::Item>, BTreeMap<u8, usize> /* rank distribution */) where S::Item: Clone + Ord + Debug {
+    let mut ranks = BTreeMap::new();
+    let stats = gtree_stats_(t, &mut ranks);
+
+    return (stats, ranks);
+}
+
+fn gtree_stats_<S: NonemptySetMeta>(
+    t: &GTree<S>,
+    rank_distribution: &mut BTreeMap<u8, usize>,
+) -> Stats<S::Item> where S::Item: Clone + Ord + Debug {
+    match t {
+        GTree::Empty => {
+            return Stats {
+                gnode_height: 0,
+                gnode_count: 0,
+                item_count: 0,
+                item_slot_count: 0,
+                rank: -1,
+                is_heap: true,
+                least_item: None,
+                greatest_item: None,
+                is_search_tree: true,
+            }
+        }
+        GTree::NonEmpty(node) => {
+            // Get stats for all children.
+            let pairs = pairs_ascending(&node.set);
+
+            match rank_distribution.get(&node.rank) {
+                None => rank_distribution.insert(node.rank, pairs.len()),
+                Some(prev) => rank_distribution.insert(node.rank, prev + pairs.len()),
+            };
+
+            let pair_stats: Vec<_> = pairs.into_iter()
+                .map(|(item, subtree)| (item, gtree_stats_(subtree, rank_distribution))).collect();
+            let right_stats = gtree_stats_(&node.right, rank_distribution);
+
+            let mut stats = right_stats.clone();
+
+            /*
+             * Simple gnode properties.
+             */
+
+            stats.gnode_height = 1 + std::cmp::max(right_stats.gnode_height, pair_stats.iter().map(|(_, stats)| stats.gnode_height).max().unwrap());
+
+            // stats.gnode_count starts out as right_stats.gnode_count
+            stats.gnode_count += 1; //counting itself
+            for (_, left_subtree_stats) in pair_stats.iter() {
+                stats.gnode_count += left_subtree_stats.gnode_count;
+            }
+
+            // stats.item_count starts out as right_stats.item_count
+            for (_, left_subtree_stats) in pair_stats.iter() {
+                stats.item_count += 1 + left_subtree_stats.item_count;
+            }
+
+            /*
+             * Item slot count.
+             */
+            // stats.item_slot_count starts out as right_stats.item_slot_count
+            for (_, left_subtree_stats) in pair_stats.iter() {
+                stats.item_slot_count += left_subtree_stats.item_slot_count;
+            }
+            stats.item_slot_count += node.set.item_slot_count();
+
+            /*
+             * Ranks and heap property.
+             */
+            stats.rank = node.rank.into();
+
+            for (i, (_, left_subtree_stats)) in pair_stats.iter().enumerate() {
+                if left_subtree_stats.rank >= node.rank.into() {
+                    stats.is_heap = false;
+                    println!("\n\n heap property: subtree {} rank too great\n{:#?}\n\n", i, t);
+                    println!("\npair_stats {:#?}\n", pair_stats);
+                }
+
+                if !left_subtree_stats.is_heap {
+                    stats.is_heap = false;
+                }
+            }
+
+            if right_stats.rank > node.rank.into() {
+                stats.is_heap = false;
+                println!("\n\n heap property: right subtree rank too great\n{:#?}\n\n", t);
+                println!("\right_stats {:#?}\n", right_stats);
+            } else if right_stats.rank == node.rank.into() {
+                if node.set.item_slot_count() > node.set.len() {
+                    println!("\n\n heap property: right subtree equal but free slots\n{:#?}\n\n", t);
+                    println!("\right_stats {:#?}\n", right_stats);
+                    stats.is_heap = false;
+                }
+            }
+
+            if !right_stats.is_heap {
+                stats.is_heap = false;
+            }
+
+            /*
+             * Check search tree property.
+             */
+            // Right descendents are greater than the greatest item in the node.
+            if let Some(ref least) = right_stats.least_item {
+                if least <= pair_stats[pair_stats.len() - 1].0 {
+                    stats.is_search_tree = false;
+                    println!("\n\n search tree property: right too great\n{:#?}\n\n", t);
+                }
+            }
+            for (i, (item, left_subtree_stats)) in pair_stats.iter().enumerate() {
+                if let Some(ref least) = left_subtree_stats.least_item {
+                    // All left descendents are greater than their parent's left sibling
+                    if i > 0 && least <= pair_stats[i - 1].0 {
+                        stats.is_search_tree = false;
+                        println!("\n\n search tree property: left {} too small\n{:#?}\n\n", i, t);
+                        println!("\npair_stats {:#?}\n", pair_stats);
+                    }
+                }
+
+                if let Some(ref greatest) = left_subtree_stats.greatest_item {
+                    // All left descendents are less than their parent
+                    if greatest >= item {
+                        stats.is_search_tree = false;
+                        println!("\n\n search tree property: left {} too great\n{:#?}\n\n", i, t);
+                    }
+                }
+            }
+
+            // Set least and greatest item of self.
+            let least_pair = &pair_stats[0];
+            match least_pair.1.least_item {
+                Some(ref least) => stats.least_item = Some(least.clone()),
+                None => stats.least_item = Some(least_pair.0.clone()),
+            }
+            match right_stats.greatest_item {
+                Some(greatest) => stats.greatest_item = Some(greatest.clone()),
+                None => stats.greatest_item = Some(pair_stats[pair_stats.len() - 1].0.clone()),
+            }
+
+            return stats;
+        }
+    }
 }
 
 pub fn sets_assert_eq<I: Debug + Eq, S1: NonemptySetMeta<Item = I>, S2: NonemptySetMeta<Item = I>>(s1: &S1, s2: &S2) {
@@ -362,8 +541,8 @@ impl<I: Clone + Ord + Debug> NonemptySetMeta for ControlSet<I> {
         return self.0.len();
     }
 
-    fn get_by_index(&self, index: usize) -> Option<&Self::Item> {
-        return self.0.get(self.0.len() - (index + 1)).map(|(item, _)| item);
+    fn get_pair_by_index(&self, index: usize) -> Option<&(Self::Item, GTree<Self>)> {
+        return self.0.get(self.0.len() - (index + 1));
     }
 
     fn from_descending(items: &[Self::Item]) -> Self {
@@ -378,6 +557,10 @@ impl<I: Clone + Ord + Debug> NonemptySetMeta for ControlSet<I> {
         }
 
         return ret;
+    }
+
+    fn item_slot_count(&self) -> usize {
+        return self.len();
     }
 }
 
