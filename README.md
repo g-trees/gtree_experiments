@@ -9,3 +9,5 @@ G-trees are implemented in [`src/lib.rs`](./src/lib.rs) and closely follow the p
 K-lists are implemented in [`src/klist.rs`](./src/klist.rs). Apologies for the code quality.
 
 For testing, we have some pretty exhaustive fuzz-tests in [`fuzz`](./fuzz). See the [rust fuzz book](https://rust-fuzz.github.io/book/cargo-fuzz/setup.html) for setup details. Run via `cargo fuzz run gtree`, `cargo fuzz run join`, etc.
+
+License: MIT
