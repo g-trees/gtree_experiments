@@ -564,17 +564,12 @@ impl<I: Clone + Ord + Debug> NonemptySetMeta for ControlSet<I> {
     }
 }
 
-// Operations for constructing random sets. The subtrees in those sets are always empty.
+// Operations for constructing simple random sets. The subtrees in those sets are always empty.
 #[derive(Debug, Arbitrary, Clone)]
 pub enum SetCreationOperation<Item> {
     Singleton(Item),
     InsertMin(Box<Self>, Item),
     RemoveMin(Box<Self>),
-    // Split and choose the left return value.
-    // SplitLeft(Box<Self>, Item),
-    // // Split and choose the right return value.
-    // SplitRight(Box<Self>, Item),
-    // Join(Box<Self>, Box<Self>),
 }
 
 // Try to create a set. Return None if a creation operation is invalid (ading a non-minimal item or joining non-disjoint ordered sets).
@@ -611,51 +606,6 @@ pub fn create_set<Item: Clone + Ord, S: NonemptySetMeta<Item = Item>>(creation: 
                 }
             }
         }
-        // SetCreationOperation::SplitLeft(creation_rec, item) => {
-        //     match create_set::<_, S>(*creation_rec) {
-        //         None => None,
-        //         Some(set_rec) => {
-        //             match set_rec {
-        //                 Set::Empty => return Some(Set::Empty),
-        //                 Set::NonEmpty(neset_rec) => {
-        //                     return Some(neset_rec.split(&item).0);
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
-        // SetCreationOperation::SplitRight(creation_rec, item) => {
-        //     match create_set::<_, S>(*creation_rec) {
-        //         None => None,
-        //         Some(set_rec) => {
-        //             match set_rec {
-        //                 Set::Empty => return Some(Set::Empty),
-        //                 Set::NonEmpty(neset_rec) => {
-        //                     return Some(neset_rec.split(&item).2);
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
-        // SetCreationOperation::Join(left_creation_rec, right_creation_rec) => {
-        //     match (create_set::<_, S>(*left_creation_rec), create_set::<_, S>(*right_creation_rec)) {
-        //         (Some(left_set_rec), Some(right_set_rec)) => {
-        //             match (left_set_rec, right_set_rec) {
-        //                 (Set::Empty, Set::Empty) => return Some(Set::Empty),
-        //                 (Set::NonEmpty(left), Set::Empty) => return Some(Set::NonEmpty(left)),
-        //                 (Set::Empty, Set::NonEmpty(right)) => return Some(Set::NonEmpty(right)),
-        //                 (Set::NonEmpty(left), Set::NonEmpty(right)) => {
-        //                     if left.get_max() < right.get_min() {
-        //                         return Some(Set::NonEmpty(NonemptySet::join(&left, &right)));
-        //                     } else {
-        //                         return None;
-        //                     }
-        //                 }
-        //             }
-        //         }
-        //         _=> return None,
-        //     }
-        // }
     }
 }
 

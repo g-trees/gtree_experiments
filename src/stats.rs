@@ -55,6 +55,7 @@ fn repeated_experiment<const K: usize, T: Clone + Ord + Debug>(size: usize, repe
     let mut physical_height = 0.0f64;
     let mut height_amplification = 0.0f64;
     let mut average_gnode_size = 0.0f64;
+    let mut max_rank = 0.0f64;
 
     for (stats, phy_height) in results.iter() {
         gnode_height += stats.gnode_height as f64;
@@ -65,6 +66,7 @@ fn repeated_experiment<const K: usize, T: Clone + Ord + Debug>(size: usize, repe
         physical_height += *phy_height as f64;
         height_amplification += (*phy_height as f64) / perfect_height;
         average_gnode_size += (item_count as f64) / (gnode_count as f64);
+        max_rank += stats.rank as f64;
     }
 
     gnode_height /= repetitions as f64;
@@ -75,6 +77,7 @@ fn repeated_experiment<const K: usize, T: Clone + Ord + Debug>(size: usize, repe
     physical_height /= repetitions as f64;
     height_amplification /= repetitions as f64;
     average_gnode_size /= repetitions as f64;
+    max_rank /= repetitions as f64;
 
     // Add together squares of deviations from means all stats, then divide by number of repetitions to obtain variances.
 
@@ -86,6 +89,7 @@ fn repeated_experiment<const K: usize, T: Clone + Ord + Debug>(size: usize, repe
     let mut variance_physical_height = 0.0f64;
     let mut variance_average_gnode_size = 0.0f64;
     let mut variance_height_amplification = 0.0f64;
+    let mut variance_max_rank = 0.0f64;
 
     for (stats, phy_height) in results.iter() {
         variance_gnode_height += ((stats.gnode_height as f64) - gnode_height) * ((stats.gnode_height as f64) - gnode_height);
@@ -96,6 +100,7 @@ fn repeated_experiment<const K: usize, T: Clone + Ord + Debug>(size: usize, repe
         variance_physical_height += ((*phy_height as f64) - physical_height) * ((*phy_height as f64) - physical_height);
         variance_height_amplification += (((*phy_height as f64) / perfect_height) - height_amplification) * (((*phy_height as f64) / perfect_height) - height_amplification);
         variance_average_gnode_size += (((item_count as f64) / (gnode_count as f64)) - average_gnode_size) * (((item_count as f64) / (gnode_count as f64)) - average_gnode_size);
+        variance_max_rank += ((stats.rank as f64) - max_rank) * ((stats.rank as f64) - max_rank);
     }
 
     variance_gnode_height /= repetitions as f64;
@@ -106,6 +111,7 @@ fn repeated_experiment<const K: usize, T: Clone + Ord + Debug>(size: usize, repe
     variance_physical_height /= repetitions as f64;
     variance_height_amplification /= repetitions as f64;
     variance_average_gnode_size /= repetitions as f64;
+    variance_max_rank /= repetitions as f64;
 
     println!("n = {}; K = {}; {} repetitions", size, K, repetitions);
     println!("Legend: name <value> (<variance>)");
@@ -115,6 +121,7 @@ fn repeated_experiment<const K: usize, T: Clone + Ord + Debug>(size: usize, repe
     println!("Space amplification: {:#?} ({:#?})", space_amplification, variance_space_amplification);
     println!("G-node count: {:#?} ({:#?})", gnode_count, variance_gnode_count);
     println!("Average G-node size: {:#?} ({:#?})", average_gnode_size, variance_average_gnode_size);
+    println!("Maximum rank: {:#?} ({:#?})", max_rank, variance_max_rank);
     println!("G-node height: {:#?} ({:#?})", gnode_height, variance_gnode_height);
     println!("Actual height: {:#?} ({:#?})", physical_height, variance_physical_height);
     println!("Perfect height: {:#?}", perfect_height);
@@ -123,21 +130,10 @@ fn repeated_experiment<const K: usize, T: Clone + Ord + Debug>(size: usize, repe
 }
 
 pub fn main() {
-    for n in [10, 100, 1000, 10000, 10000] {
-        repeated_experiment::<1, u64>(n, 1000);
-        repeated_experiment::<3, u64>(n, 1000);
-        repeated_experiment::<15, u64>(n, 1000);
-        repeated_experiment::<63, u64>(n, 1000);
+    for n in [10, 100, 1000, 10000, 100000] {
+        repeated_experiment::<1, u64>(n, 200);
+        repeated_experiment::<3, u64>(n, 200);
+        repeated_experiment::<15, u64>(n, 200);
+        repeated_experiment::<63, u64>(n, 200);
     }
-    // let tree: GTree<NonemptyReverseKList<15, u64>> = random_klist_tree(1_000_000);
-    // let (stats, ranks) = gtree_stats(&tree);
-    // let phy_height = physical_height(&tree);
-    
-    // println!("{:#?}", stats);
-    // println!("physical height: {:#?}", phy_height);
-    // println!("rank distribution {:#?}", ranks);
-
-    // if stats.item_count < 10 {
-    //     println!("{:#?}", tree);
-    // }
 }

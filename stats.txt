@@ -1,0 +1,318 @@
+n = 10; K = 1; 1000 repetitions
+Legend: name <value> (<variance>)
+---------------------------------------
+Item count: 10.0 (0.0)
+Item slot count: 10.0 (0.0)
+Space amplification: 1.0 (0.0)
+G-node count: 6.187 (2.1740310000000136)
+Average G-node size: 1.605836440267157 (0.00010932344764573764)
+Maximum rank: 3.737 (3.3118310000000153)
+G-node height: 3.45 (0.5174999999999981)
+Actual height: 6.055 (1.3059750000000008)
+Perfect height: 4.0
+Height amplification: 1.51375 (0.08162343750000005)
+
+
+
+n = 10; K = 3; 1000 repetitions
+Legend: name <value> (<variance>)
+---------------------------------------
+Item count: 10.0 (0.0)
+Item slot count: 15.42 (7.959599999999985)
+Space amplification: 1.5419999999999991 (0.07959599999999994)
+G-node count: 3.956 (2.152063999999988)
+Average G-node size: 2.5638344649511517 (0.001298060049776575)
+Maximum rank: 1.606 (0.8887639999999984)
+G-node height: 2.381 (0.4218389999999906)
+Actual height: 3.443 (0.3967510000000027)
+Perfect height: 2.0
+Height amplification: 1.7215 (0.09918775000000067)
+
+
+
+n = 10; K = 15; 1000 repetitions
+Legend: name <value> (<variance>)
+---------------------------------------
+Item count: 10.0 (0.0)
+Item slot count: 29.805 (262.5369749999996)
+Space amplification: 2.9805 (2.625369749999992)
+G-node count: 1.987 (1.1668309999999953)
+Average G-node size: 5.238323439154508 (0.042275803974026215)
+Maximum rank: 0.529 (0.30915899999999963)
+G-node height: 1.508 (0.26793599999999823)
+Actual height: 1.508 (0.26793599999999823)
+Perfect height: 1.0
+Height amplification: 1.508 (0.26793599999999823)
+
+
+
+n = 10; K = 63; 1000 repetitions
+Legend: name <value> (<variance>)
+---------------------------------------
+Item count: 10.0 (0.0)
+Item slot count: 79.821 (1800.7789590000257)
+Space amplification: 7.982100000000095 (18.007789590000336)
+G-node count: 1.267 (0.4537109999999917)
+Average G-node size: 8.08894912648569 (0.03852948934325024)
+Maximum rank: 0.147 (0.13139099999999934)
+G-node height: 1.145 (0.1259749999999985)
+Actual height: 1.145 (0.1259749999999985)
+Perfect height: 1.0
+Height amplification: 1.145 (0.1259749999999985)
+
+
+
+n = 100; K = 1; 1000 repetitions
+Legend: name <value> (<variance>)
+---------------------------------------
+Item count: 100.0 (0.0)
+Item slot count: 100.0 (0.0)
+Space amplification: 1.0 (0.0)
+G-node count: 52.212 (25.08105599999986)
+Average G-node size: 1.9094930799204086 (3.335571558168619e-5)
+Maximum rank: 7.008 (3.4819359999999944)
+G-node height: 6.67 (0.7470999999999919)
+Actual height: 15.293 (5.6051509999999825)
+Perfect height: 7.0
+Height amplification: 2.1847142857142843 (0.11439083673469255)
+
+
+
+n = 100; K = 3; 1000 repetitions
+Legend: name <value> (<variance>)
+---------------------------------------
+Item count: 100.0 (0.0)
+Item slot count: 133.806 (55.32836399999997)
+Space amplification: 1.3380600000000038 (0.005532836400000001)
+G-node count: 27.511 (19.085879000000016)
+Average G-node size: 3.637434112510273 (6.372797392535846e-6)
+Maximum rank: 3.227 (0.8974709999999964)
+G-node height: 4.016 (0.5057439999999956)
+Actual height: 8.614 (2.401003999999987)
+Perfect height: 4.0
+Height amplification: 2.1535 (0.1500627499999992)
+
+
+
+n = 100; K = 15; 1000 repetitions
+Legend: name <value> (<variance>)
+---------------------------------------
+Item count: 100.0 (0.0)
+Item slot count: 174.33 (785.5011000000003)
+Space amplification: 1.7432999999999998 (0.07855010999999991)
+G-node count: 8.334 (6.7164440000000045)
+Average G-node size: 12.15964742526418 (0.025794720382667606)
+Maximum rank: 1.353 (0.29639100000000074)
+G-node height: 2.331 (0.23743900000000445)
+Actual height: 4.276 (0.9778240000000097)
+Perfect height: 2.0
+Height amplification: 2.138 (0.24445600000000242)
+
+
+
+n = 100; K = 63; 1000 repetitions
+Legend: name <value> (<variance>)
+---------------------------------------
+Item count: 100.0 (0.0)
+Item slot count: 243.054 (6119.547083999909)
+Space amplification: 2.430540000000008 (0.6119547084000007)
+G-node count: 3.293 (2.2131510000000256)
+Average G-node size: 30.653398466053012 (0.08176875691912786)
+Maximum rank: 0.809 (0.19251900000000172)
+G-node height: 1.804 (0.18358400000000166)
+Actual height: 2.369 (0.23883899999999444)
+Perfect height: 2.0
+Height amplification: 1.1845 (0.05970974999999861)
+
+
+
+n = 1000; K = 1; 1000 repetitions
+Legend: name <value> (<variance>)
+---------------------------------------
+Item count: 1000.0 (0.0)
+Item slot count: 1000.0 (0.0)
+Space amplification: 1.0 (0.0)
+G-node count: 502.519 (257.1756390000003)
+Average G-node size: 1.9939975320034018 (1.6184718699929735e-5)
+Maximum rank: 10.297 (4.000791000000012)
+G-node height: 9.893 (0.7515510000000076)
+Actual height: 26.587 (8.892430999999927)
+Perfect height: 10.0
+Height amplification: 2.658700000000002 (0.08892431000000052)
+
+
+
+n = 1000; K = 3; 1000 repetitions
+Legend: name <value> (<variance>)
+---------------------------------------
+Item count: 1000.0 (0.0)
+Item slot count: 1301.583 (558.2491110000008)
+Space amplification: 1.3015829999999975 (0.0005582491110000026)
+G-node count: 252.94 (191.70239999999993)
+Average G-node size: 3.9515843361579943 (3.695715337511159e-6)
+Maximum rank: 4.867 (0.9773110000000119)
+G-node height: 5.647 (0.5063910000000045)
+Actual height: 14.922 (3.3759160000000312)
+Perfect height: 5.0
+Height amplification: 2.9844000000000026 (0.13503663999999949)
+
+
+
+n = 1000; K = 15; 1000 repetitions
+Legend: name <value> (<variance>)
+---------------------------------------
+Item count: 1000.0 (0.0)
+Item slot count: 1544.37 (6140.3031000000165)
+Space amplification: 1.5443699999999985 (0.006140303099999986)
+G-node count: 65.462 (57.22455599999991)
+Average G-node size: 15.24225973388782 (0.0011409717197514773)
+Maximum rank: 2.192 (0.20513600000000032)
+G-node height: 3.182 (0.18087599999999807)
+Actual height: 8.06 (2.036399999999982)
+Perfect height: 3.0
+Height amplification: 2.6866666666666723 (0.2262666666666682)
+
+
+
+n = 1000; K = 63; 1000 repetitions
+Legend: name <value> (<variance>)
+---------------------------------------
+Item count: 1000.0 (0.0)
+Item slot count: 1669.311 (31617.01827900018)
+Space amplification: 1.6693109999999962 (0.03161701827900026)
+G-node count: 17.753 (15.253990999999944)
+Average G-node size: 56.376836938611184 (0.0023357000494594205)
+Maximum rank: 1.226 (0.18692399999999687)
+G-node height: 2.221 (0.17415900000000178)
+Actual height: 5.052 (1.4292960000000001)
+Perfect height: 2.0
+Height amplification: 2.526 (0.35732400000000003)
+
+
+
+n = 10000; K = 1; 1000 repetitions
+Legend: name <value> (<variance>)
+---------------------------------------
+Item count: 10000.0 (0.0)
+Item slot count: 10000.0 (0.0)
+Space amplification: 1.0 (0.0)
+G-node count: 5002.097 (2394.451590999997)
+Average G-node size: 1.9983307570784787 (6.902196121602229e-7)
+Maximum rank: 13.68 (3.8836000000000044)
+G-node height: 13.231 (0.7196389999999988)
+Actual height: 38.203 (9.471791000000012)
+Perfect height: 14.0
+Height amplification: 2.7287857142857157 (0.048325464285714125)
+
+
+
+n = 10000; K = 3; 1000 repetitions
+Legend: name <value> (<variance>)
+---------------------------------------
+Item count: 10000.0 (0.0)
+Item slot count: 12978.489 (5329.569879000006)
+Space amplification: 1.2978488999999964 (5.3295698790000064e-5)
+G-node count: 2504.328 (1826.136416000001)
+Average G-node size: 3.9941887799757483 (1.2135500563487506e-6)
+Maximum rank: 6.529 (0.8571590000000114)
+G-node height: 7.318 (0.43887600000000576)
+Actual height: 21.969 (4.406038999999986)
+Perfect height: 7.0
+Height amplification: 3.1384285714285696 (0.0899191632653052)
+
+
+
+n = 10000; K = 15; 1000 repetitions
+Legend: name <value> (<variance>)
+---------------------------------------
+Item count: 10000.0 (0.0)
+Item slot count: 15149.985 (61098.52477500004)
+Space amplification: 1.5149984999999984 (0.0006109852477499999)
+G-node count: 628.203 (572.4917910000008)
+Average G-node size: 15.908375953427047 (0.00010090847850576922)
+Maximum rank: 3.069 (0.24623900000000104)
+G-node height: 4.054 (0.2110839999999991)
+Actual height: 12.36 (2.4304)
+Perfect height: 4.0
+Height amplification: 3.09 (0.1519)
+
+
+
+n = 10000; K = 63; 1000 repetitions
+Legend: name <value> (<variance>)
+---------------------------------------
+Item count: 10000.0 (0.0)
+Item slot count: 15778.665 (320957.05477500014)
+Space amplification: 1.577866500000005 (0.003209570547750019)
+G-node count: 159.161 (160.19507899999965)
+Average G-node size: 62.68145839170749 (0.021905065497364)
+Maximum rank: 1.959 (0.11931900000000126)
+G-node height: 2.953 (0.11279099999999781)
+Actual height: 8.432 (1.6853759999999913)
+Perfect height: 3.0
+Height amplification: 2.8106666666666666 (0.1872640000000005)
+
+
+
+n = 100000; K = 1; 1000 repetitions
+Legend: name <value> (<variance>)
+---------------------------------------
+Item count: 100000.0 (0.0)
+Item slot count: 100000.0 (0.0)
+Space amplification: 1.0 (0.0)
+G-node count: 50001.336 (26339.65510399996)
+Average G-node size: 1.999804952592771 (2.0053062180534267e-8)
+Maximum rank: 16.884 (3.2705440000000436)
+G-node height: 16.562 (0.7301559999999933)
+Actual height: 50.578 (11.861915999999985)
+Perfect height: 17.0
+Height amplification: 2.9751764705882473 (0.041044692041522425)
+
+
+
+n = 100000; K = 3; 1000 repetitions
+Legend: name <value> (<variance>)
+---------------------------------------
+Item count: 100000.0 (0.0)
+Item slot count: 129734.652 (56287.44489599995)
+Space amplification: 1.297346519999998 (5.628744489600007e-6)
+G-node count: 25004.329 (18939.228759000005)
+Average G-node size: 4.000205689506382 (8.067804668577058e-7)
+Maximum rank: 8.223 (0.9152709999999933)
+G-node height: 9.001 (0.4569989999999978)
+Actual height: 29.13 (4.931099999999985)
+Perfect height: 9.0
+Height amplification: 3.236666666666668 (0.06087777777777744)
+
+
+
+n = 100000; K = 15; 1000 repetitions
+Legend: name <value> (<variance>)
+---------------------------------------
+Item count: 100000.0 (0.0)
+Item slot count: 151231.35 (636831.8774999944)
+Space amplification: 1.5123135000000048 (6.368318775000011e-5)
+G-node count: 6255.342 (6113.333036000002)
+Average G-node size: 15.985035123073718 (1.6926938527827066e-6)
+Maximum rank: 3.882 (0.2940759999999997)
+G-node height: 4.853 (0.24339100000000413)
+Actual height: 16.656 (2.4536639999999896)
+Perfect height: 5.0
+Height amplification: 3.3311999999999986 (0.09814656000000047)
+
+
+
+n = 100000; K = 63; 200 repetitions
+Legend: name <value> (<variance>)
+---------------------------------------
+Item count: 100000.0 (0.0)
+Item slot count: 156506.175 (3044756.334375)
+Space amplification: 1.5650617500000004 (0.00030447563343750006)
+G-node count: 1563.98 (1486.7996000000005)
+Average G-node size: 63.785901008953495 (0.023573167180848866)
+Maximum rank: 2.35 (0.23750000000000004)
+G-node height: 3.345 (0.22597500000000054)
+Actual height: 12.08 (2.5236000000000005)
+Perfect height: 3.0
+Height amplification: 4.0266666666666655 (0.2803999999999996)
+

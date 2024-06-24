@@ -489,14 +489,6 @@ impl<const K: usize, I: Clone + Ord + Debug> NonemptySetMeta for NonemptyReverse
     }
 }
 
-fn div_ceil(p: usize, q: usize) -> usize {
-    if p % q == 0 {
-        return p / q;
-    } else {
-        return (p / q) + 1;
-    }
-}
-
 pub fn physical_height<const K: usize, T: Clone + Ord + Debug>(
     t: &GTree<NonemptyReverseKList<K, T>>,
 ) -> usize {
@@ -510,10 +502,10 @@ pub fn physical_height<const K: usize, T: Clone + Ord + Debug>(
 
             for i in 0..len {
                 let (_, subtree) = node.set.get_pair_by_index(i).unwrap();
-                height = std::cmp::max(height, physical_height(subtree) + div_ceil(i, K));
+                height = std::cmp::max(height, physical_height(subtree) + 1 + i/K);
 
                 if i == len - 1 {
-                    height = std::cmp::max(height, physical_height(&node.right) + div_ceil(i, K));
+                    height = std::cmp::max(height, physical_height(&node.right) + 1 + i/K);
                 }
             }
 
@@ -521,33 +513,3 @@ pub fn physical_height<const K: usize, T: Clone + Ord + Debug>(
         }
     }
 }
-
-// pub fn physical_height<const K: usize, T: Clone + Ord + Debug>(
-//     t: &GTree<NonemptyReverseKList<K, T>>,
-// ) -> usize {
-//     // println!("t: {:#?}", t);
-//     match t {
-//         GTree::Empty => return 0,
-//         GTree::NonEmpty(ref node) => {
-//             let len = node.set.len();
-//             // println!("len: {:#?}", len);
-//             let mut height = 0;
-
-//             let mut extra_height = 0;
-//             for i in 0..len {
-//                 if i % K == 0 {
-//                     extra_height += 1;
-//                 }
-
-//                 let (_, subtree) = node.set.get_pair_by_index(i).unwrap();
-//                 height = std::cmp::max(height, physical_height(subtree) + extra_height);
-
-//                 if i == len - 1 {
-//                     height = std::cmp::max(height, physical_height(&node.right) + extra_height);
-//                 }
-//             }
-
-//             return height;
-//         }
-//     }
-// }
