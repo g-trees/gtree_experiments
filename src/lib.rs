@@ -4,10 +4,10 @@
 pub mod klist;
 
 use std::collections::BTreeMap;
-use std::{collections::BTreeSet, rc::Rc};
 use std::fmt::Debug;
+use std::{collections::BTreeSet, rc::Rc};
 
-use arbitrary::{Arbitrary};
+use arbitrary::Arbitrary;
 
 /*
 Definitions for NonemptySet and GTrees.
@@ -34,7 +34,14 @@ where
     type Item;
 
     fn singleton(item: (Self::Item, GTree<Self>)) -> Self;
-    fn split(&self, key: &Self::Item) -> (Set<Self>, Option<GTree<Self>> /* left subtree of key (if key is in self, else None) */, Set<Self>);
+    fn split(
+        &self,
+        key: &Self::Item,
+    ) -> (
+        Set<Self>,
+        Option<GTree<Self>>, /* left subtree of key (if key is in self, else None) */
+        Set<Self>,
+    );
     fn join(left: &Self, right: &Self) -> Self;
     fn remove_min(&self) -> ((Self::Item, GTree<Self>), Set<Self>);
     fn insert_min(&self, new_min: (Self::Item, GTree<Self>)) -> Self;
@@ -78,18 +85,17 @@ fn update_right<S: NonemptySet>(node: &GTreeNode<S>, right: GTree<S>) -> Rc<GTre
 fn lift<S: NonemptySet>(s: &Set<S>, right: GTree<S>, rank: u8) -> GTree<S> {
     match s {
         Set::Empty => return right,
-        Set::NonEmpty(set) => return GTree::NonEmpty(Rc::new(GTreeNode {
-            rank,
-            set: set.clone(),
-            right,
-        })),
+        Set::NonEmpty(set) => {
+            return GTree::NonEmpty(Rc::new(GTreeNode {
+                rank,
+                set: set.clone(),
+                right,
+            }))
+        }
     };
 }
 
-pub fn unzip<S: NonemptySet + Debug>(
-    t: &GTree<S>,
-    key: &S::Item,
-) -> (GTree<S>, GTree<S>) {
+pub fn unzip<S: NonemptySet + Debug>(t: &GTree<S>, key: &S::Item) -> (GTree<S>, GTree<S>) {
     match t {
         // Empty tree is trivial to unzip.
         GTree::Empty => return (GTree::Empty, GTree::Empty),
@@ -106,10 +112,7 @@ pub fn unzip<S: NonemptySet + Debug>(
             (_, None, Set::Empty) => {
                 // If the current node does not contain the split point, and all its items are less than the split point, then recursively split its right child (and replace it with its left recursive return).
                 let (left, right) = unzip(&s.right, key);
-                return (
-                    GTree::NonEmpty(update_right(s, left)),
-                    right,
-                );                
+                return (GTree::NonEmpty(update_right(s, left)), right);
             }
 
             (left_set, None, Set::NonEmpty(r)) => {
@@ -134,19 +137,13 @@ pub fn unzip<S: NonemptySet + Debug>(
                 //     right: s.right.clone(),
                 // }, right));
                 // println!("split returning\n{:#?}\n{:#?}", lift(&left_set, left.clone(), s.rank), right_return);
-                return (
-                    lift(&left_set, left.clone(), s.rank),
-                    right_return,
-                );
+                return (lift(&left_set, left.clone(), s.rank), right_return);
             }
         },
     }
 }
 
-pub fn zip2<S: NonemptySet>(
-    left: &GTree<S>,
-    right: &GTree<S>,
-) -> GTree<S> {
+pub fn zip2<S: NonemptySet>(left: &GTree<S>, right: &GTree<S>) -> GTree<S> {
     match (left, right) {
         (GTree::Empty, _) => return right.clone(),
         (_, GTree::Empty) => return left.clone(),
@@ -190,11 +187,7 @@ pub fn zip3<S: NonemptySet>(
     return zip2(&zip2(&left, &mid), &right);
 }
 
-pub fn insert<S: NonemptySet + Debug>(
-    t: &GTree<S>,
-    item: S::Item,
-    rank: u8,
-) -> GTree<S> {
+pub fn insert<S: NonemptySet + Debug>(t: &GTree<S>, item: S::Item, rank: u8) -> GTree<S> {
     // println!("inserting into {:#?}\n", t);
     let (left, right) = unzip(t, &item);
     // println!("a unzipped {:#?}\n{:#?}", left, right);
@@ -203,32 +196,72 @@ pub fn insert<S: NonemptySet + Debug>(
     return zipped;
 }
 
-pub fn delete<S: NonemptySet + Debug>(
-    t: &GTree<S>,
-    item: &S::Item,
-) -> GTree<S> {
+pub fn delete<S: NonemptySet + Debug>(t: &GTree<S>, item: &S::Item) -> GTree<S> {
     let (left, right) = unzip(t, item);
     return zip2(&left, &right);
 }
 
-pub fn has<S: NonemptySet>(
-    t: &GTree<S>,
-    key: &S::Item,
-) -> bool where S::Item: Ord {
+pub fn delete_explicit<S: NonemptySet + Debug>(t: &GTree<S>, item: &S::Item) -> GTree<S> {
     match t {
-        GTree::Empty => return false,
-        GTree::NonEmpty(node) => {
-            match node.set.search(key) {
-                None => return has(&node.right, key),
-                Some(yay) => {
-                    if &yay.0 == key {
-                        return true;
-                    } else {
-                        return has(&yay.1, key);
+        GTree::Empty => return GTree::Empty,
+        GTree::NonEmpty(s) => match s.set.split(item) {
+            (left_set, Some(left_subtree_of_key), right_set) => {
+                // The set in `s` contained `item`.
+                // Its left subtree becomes the right child of a GTree node together with `left_set`, and `right_set` becomes a GTree node together with the right subtree of `s`.
+                // Zip together these two trees to obtain a tree that contains all items of `s` except `item`.
+                return zip2(
+                    &lift(&left_set, left_subtree_of_key, s.rank),
+                    &lift(&right_set, s.right.clone(), s.rank),
+                );
+            }
+            (Set::NonEmpty(left_set), None, Set::Empty) => {
+                // The set in `s` did not contain `item`, nor any greater items.
+                // Hence, `item` must be in the right subtree (if at all).
+                return lift(
+                    &Set::NonEmpty(left_set),
+                    delete_explicit(&s.right, item),
+                    s.rank,
+                );
+            }
+            (left_set, None, Set::NonEmpty(right_set)) => {
+                // The set in `s` did not contain `item`.
+                // `left_set` only contains items less than `item`, so `item` must be in the left subtree of the least item in `right_set` (if at all).
+                let ((leftmost_item, leftmost_subtree), others) = right_set.remove_min();
+                let new_subtree = delete_explicit(&leftmost_subtree, item);
+                let new_right = others.insert_min((leftmost_item, new_subtree));
+
+                match left_set {
+                    Set::Empty => return lift(&Set::NonEmpty(new_right), s.right.clone(), s.rank),
+                    Set::NonEmpty(left) => {
+                        return lift(
+                            &Set::NonEmpty(NonemptySet::join(&left, &new_right)),
+                            s.right.clone(),
+                            s.rank,
+                        )
                     }
                 }
             }
-        }
+            (Set::Empty, None, Set::Empty) => unreachable!(),
+        },
+    }
+}
+
+pub fn has<S: NonemptySet>(t: &GTree<S>, key: &S::Item) -> bool
+where
+    S::Item: Ord,
+{
+    match t {
+        GTree::Empty => return false,
+        GTree::NonEmpty(node) => match node.set.search(key) {
+            None => return has(&node.right, key),
+            Some(yay) => {
+                if &yay.0 == key {
+                    return true;
+                } else {
+                    return has(&yay.1, key);
+                }
+            }
+        },
     }
 }
 
@@ -256,8 +289,11 @@ where
 }
 
 // Return a vec of item-left_subtree pairs in descending order.
-fn pairs_ascending<S: NonemptySetMeta>(s: &S) -> Vec<&(S::Item, GTree<S>)> where S::Item: Ord {
-    let mut ret  = vec![];
+fn pairs_ascending<S: NonemptySetMeta>(s: &S) -> Vec<&(S::Item, GTree<S>)>
+where
+    S::Item: Ord,
+{
+    let mut ret = vec![];
 
     for i in 0..s.len() {
         let pair = s.get_pair_by_index(i).unwrap();
@@ -283,7 +319,13 @@ pub struct Stats<Item> {
 
 pub fn gtree_stats<S: NonemptySetMeta>(
     t: &GTree<S>,
-) -> (Stats<S::Item>, BTreeMap<u8, usize> /* rank distribution */) where S::Item: Clone + Ord + Debug {
+) -> (
+    Stats<S::Item>,
+    BTreeMap<u8, usize>, /* rank distribution */
+)
+where
+    S::Item: Clone + Ord + Debug,
+{
     let mut ranks = BTreeMap::new();
     let stats = gtree_stats_(t, &mut ranks);
 
@@ -293,7 +335,10 @@ pub fn gtree_stats<S: NonemptySetMeta>(
 fn gtree_stats_<S: NonemptySetMeta>(
     t: &GTree<S>,
     rank_distribution: &mut BTreeMap<u8, usize>,
-) -> Stats<S::Item> where S::Item: Clone + Ord + Debug {
+) -> Stats<S::Item>
+where
+    S::Item: Clone + Ord + Debug,
+{
     match t {
         GTree::Empty => {
             return Stats {
@@ -317,8 +362,10 @@ fn gtree_stats_<S: NonemptySetMeta>(
                 Some(prev) => rank_distribution.insert(node.rank, prev + pairs.len()),
             };
 
-            let pair_stats: Vec<_> = pairs.into_iter()
-                .map(|(item, subtree)| (item, gtree_stats_(subtree, rank_distribution))).collect();
+            let pair_stats: Vec<_> = pairs
+                .into_iter()
+                .map(|(item, subtree)| (item, gtree_stats_(subtree, rank_distribution)))
+                .collect();
             let right_stats = gtree_stats_(&node.right, rank_distribution);
 
             let mut stats = right_stats.clone();
@@ -327,7 +374,14 @@ fn gtree_stats_<S: NonemptySetMeta>(
              * Simple gnode properties.
              */
 
-            stats.gnode_height = 1 + std::cmp::max(right_stats.gnode_height, pair_stats.iter().map(|(_, stats)| stats.gnode_height).max().unwrap());
+            stats.gnode_height = 1 + std::cmp::max(
+                right_stats.gnode_height,
+                pair_stats
+                    .iter()
+                    .map(|(_, stats)| stats.gnode_height)
+                    .max()
+                    .unwrap(),
+            );
 
             // stats.gnode_count starts out as right_stats.gnode_count
             stats.gnode_count += 1; //counting itself
@@ -357,7 +411,10 @@ fn gtree_stats_<S: NonemptySetMeta>(
             for (i, (_, left_subtree_stats)) in pair_stats.iter().enumerate() {
                 if left_subtree_stats.rank >= node.rank.into() {
                     stats.is_heap = false;
-                    println!("\n\n heap property: subtree {} rank too great\n{:#?}\n\n", i, t);
+                    println!(
+                        "\n\n heap property: subtree {} rank too great\n{:#?}\n\n",
+                        i, t
+                    );
                     println!("\npair_stats {:#?}\n", pair_stats);
                 }
 
@@ -368,11 +425,17 @@ fn gtree_stats_<S: NonemptySetMeta>(
 
             if right_stats.rank > node.rank.into() {
                 stats.is_heap = false;
-                println!("\n\n heap property: right subtree rank too great\n{:#?}\n\n", t);
+                println!(
+                    "\n\n heap property: right subtree rank too great\n{:#?}\n\n",
+                    t
+                );
                 println!("\right_stats {:#?}\n", right_stats);
             } else if right_stats.rank == node.rank.into() {
                 if node.set.item_slot_count() > node.set.len() {
-                    println!("\n\n heap property: right subtree equal but free slots\n{:#?}\n\n", t);
+                    println!(
+                        "\n\n heap property: right subtree equal but free slots\n{:#?}\n\n",
+                        t
+                    );
                     println!("\right_stats {:#?}\n", right_stats);
                     stats.is_heap = false;
                 }
@@ -397,7 +460,10 @@ fn gtree_stats_<S: NonemptySetMeta>(
                     // All left descendents are greater than their parent's left sibling
                     if i > 0 && least <= pair_stats[i - 1].0 {
                         stats.is_search_tree = false;
-                        println!("\n\n search tree property: left {} too small\n{:#?}\n\n", i, t);
+                        println!(
+                            "\n\n search tree property: left {} too small\n{:#?}\n\n",
+                            i, t
+                        );
                         println!("\npair_stats {:#?}\n", pair_stats);
                     }
                 }
@@ -406,7 +472,10 @@ fn gtree_stats_<S: NonemptySetMeta>(
                     // All left descendents are less than their parent
                     if greatest >= item {
                         stats.is_search_tree = false;
-                        println!("\n\n search tree property: left {} too great\n{:#?}\n\n", i, t);
+                        println!(
+                            "\n\n search tree property: left {} too great\n{:#?}\n\n",
+                            i, t
+                        );
                     }
                 }
             }
@@ -427,7 +496,14 @@ fn gtree_stats_<S: NonemptySetMeta>(
     }
 }
 
-pub fn sets_assert_eq<I: Debug + Eq, S1: NonemptySetMeta<Item = I>, S2: NonemptySetMeta<Item = I>>(s1: &S1, s2: &S2) {
+pub fn sets_assert_eq<
+    I: Debug + Eq,
+    S1: NonemptySetMeta<Item = I>,
+    S2: NonemptySetMeta<Item = I>,
+>(
+    s1: &S1,
+    s2: &S2,
+) {
     if s1.len() != s2.len() {
         println!("{:?}\n\n{:?}", s1, s2);
         let len = s1.len();
@@ -442,7 +518,14 @@ pub fn sets_assert_eq<I: Debug + Eq, S1: NonemptySetMeta<Item = I>, S2: Nonempty
     }
 }
 
-pub fn possibly_empty_sets_assert_eq<I: Debug + Eq, S1: NonemptySetMeta<Item = I>, S2: NonemptySetMeta<Item = I>>(s1: &Set<S1>, s2: &Set<S2>) {
+pub fn possibly_empty_sets_assert_eq<
+    I: Debug + Eq,
+    S1: NonemptySetMeta<Item = I>,
+    S2: NonemptySetMeta<Item = I>,
+>(
+    s1: &Set<S1>,
+    s2: &Set<S2>,
+) {
     match (s1, s2) {
         (Set::Empty, Set::Empty) => {
             // no-op
@@ -476,29 +559,59 @@ impl<I: Clone + Ord> NonemptySet for ControlSet<I> {
     fn remove_min(&self) -> ((Self::Item, GTree<Self>), Set<Self>) {
         let mut ret = self.clone();
         let popped = ret.0.pop().unwrap();
-        return (popped, if ret.0.len() == 0 { Set::Empty } else { Set::NonEmpty(ret) });
+        return (
+            popped,
+            if ret.0.len() == 0 {
+                Set::Empty
+            } else {
+                Set::NonEmpty(ret)
+            },
+        );
     }
 
-    fn split(&self, key: &Self::Item) -> (Set<Self>, Option<GTree<Self>> /* left subtree of key (if key is in self, else None) */, Set<Self>) {
+    fn split(
+        &self,
+        key: &Self::Item,
+    ) -> (
+        Set<Self>,
+        Option<GTree<Self>>, /* left subtree of key (if key is in self, else None) */
+        Set<Self>,
+    ) {
         match self.0.binary_search_by(|(my_item, _)| {
             return key.cmp(my_item);
         }) {
             Ok(i) => {
                 let right = self.0[0..i].to_vec();
-                let left = self.0[i+1..].to_vec();
+                let left = self.0[i + 1..].to_vec();
                 return (
-                    if left.len() == 0 { Set::Empty } else { Set::NonEmpty(ControlSet(left)) },
+                    if left.len() == 0 {
+                        Set::Empty
+                    } else {
+                        Set::NonEmpty(ControlSet(left))
+                    },
                     Some(self.0[i].1.clone()),
-                    if right.len() == 0 { Set::Empty } else { Set::NonEmpty(ControlSet(right)) },
+                    if right.len() == 0 {
+                        Set::Empty
+                    } else {
+                        Set::NonEmpty(ControlSet(right))
+                    },
                 );
             }
             Err(i) => {
                 let right = self.0[0..i].to_vec();
                 let left = self.0[i..].to_vec();
                 return (
-                    if left.len() == 0 { Set::Empty } else { Set::NonEmpty(ControlSet(left)) },
+                    if left.len() == 0 {
+                        Set::Empty
+                    } else {
+                        Set::NonEmpty(ControlSet(left))
+                    },
                     None,
-                    if right.len() == 0 { Set::Empty } else { Set::NonEmpty(ControlSet(right)) },
+                    if right.len() == 0 {
+                        Set::Empty
+                    } else {
+                        Set::NonEmpty(ControlSet(right))
+                    },
                 );
             }
         }
@@ -509,7 +622,7 @@ impl<I: Clone + Ord> NonemptySet for ControlSet<I> {
         new.0.extend_from_slice(&left.0[..]);
         return new;
     }
-    
+
     fn search(&self, key: &Self::Item) -> Option<(Self::Item, GTree<Self>)> {
         match self.0.binary_search_by(|x| key.cmp(&x.0)) {
             Ok(i) => {
@@ -531,7 +644,7 @@ impl<I: Clone + Ord + Debug> NonemptySetMeta for ControlSet<I> {
     fn get_max(&self) -> &Self::Item {
         return &self.0[0].0;
     }
-    
+
     /// Return a reference to the minimal item in the set.
     fn get_min(&self) -> &Self::Item {
         return &self.0[self.0.len() - 1].0;
@@ -573,7 +686,9 @@ pub enum SetCreationOperation<Item> {
 }
 
 // Try to create a set. Return None if a creation operation is invalid (ading a non-minimal item or joining non-disjoint ordered sets).
-pub fn create_set<Item: Clone + Ord, S: NonemptySetMeta<Item = Item>>(creation: SetCreationOperation<Item>) -> Option<Set<S>> {
+pub fn create_set<Item: Clone + Ord, S: NonemptySetMeta<Item = Item>>(
+    creation: SetCreationOperation<Item>,
+) -> Option<Set<S>> {
     match creation {
         SetCreationOperation::Singleton(item) => {
             return Some(Set::NonEmpty(S::singleton((item, GTree::Empty))));
@@ -581,45 +696,40 @@ pub fn create_set<Item: Clone + Ord, S: NonemptySetMeta<Item = Item>>(creation: 
         SetCreationOperation::InsertMin(creation_rec, item) => {
             match create_set::<_, S>(*creation_rec) {
                 None => None,
-                Some(set_rec) => {
-                    match set_rec {
-                        Set::Empty => return Some(Set::NonEmpty(S::singleton((item, GTree::Empty)))),
-                        Set::NonEmpty(neset_rec) => {
-                            if neset_rec.get_min() <= &item {
-                                return None;
-                            } else {
-                                return Some(Set::NonEmpty(neset_rec.insert_min((item, GTree::Empty))));
-                            }
+                Some(set_rec) => match set_rec {
+                    Set::Empty => return Some(Set::NonEmpty(S::singleton((item, GTree::Empty)))),
+                    Set::NonEmpty(neset_rec) => {
+                        if neset_rec.get_min() <= &item {
+                            return None;
+                        } else {
+                            return Some(Set::NonEmpty(neset_rec.insert_min((item, GTree::Empty))));
                         }
                     }
-                }
+                },
             }
         }
-        SetCreationOperation::RemoveMin(creation_rec) => {
-            match create_set::<_, S>(*creation_rec) {
-                None => None,
-                Some(set_rec) => {
-                    match set_rec {
-                        Set::Empty => return Some(Set::Empty),
-                        Set::NonEmpty(neset_rec) => return Some(neset_rec.remove_min().1),
-                    }
-                }
-            }
-        }
+        SetCreationOperation::RemoveMin(creation_rec) => match create_set::<_, S>(*creation_rec) {
+            None => None,
+            Some(set_rec) => match set_rec {
+                Set::Empty => return Some(Set::Empty),
+                Set::NonEmpty(neset_rec) => return Some(neset_rec.remove_min().1),
+            },
+        },
     }
 }
-
-
 
 #[derive(Debug, Arbitrary, Clone)]
 pub enum TreeCreation<Item> {
     Empty,
     Insert(Box<Self>, Item, u8),
     Remove(Box<Self>, Item),
+    RemoveExplicit(Box<Self>, Item),
 }
 
 // Create a tree according to a TreeDescription value.
-pub fn create_tree<Item: Clone + Ord, S: NonemptySet<Item = Item> + Debug>(creation: TreeCreation<Item>) -> GTree<S> {
+pub fn create_tree<Item: Clone + Ord, S: NonemptySet<Item = Item> + Debug>(
+    creation: TreeCreation<Item>,
+) -> GTree<S> {
     match creation {
         TreeCreation::Empty => return GTree::Empty,
         TreeCreation::Insert(creation_rec, item, rank) => {
@@ -630,6 +740,11 @@ pub fn create_tree<Item: Clone + Ord, S: NonemptySet<Item = Item> + Debug>(creat
         TreeCreation::Remove(creation_rec, item) => {
             let tree_rec = create_tree(*creation_rec);
             let new_tree = delete(&tree_rec, &item);
+            return new_tree;
+        }
+        TreeCreation::RemoveExplicit(creation_rec, item) => {
+            let tree_rec = create_tree(*creation_rec);
+            let new_tree = delete_explicit(&tree_rec, &item);
             return new_tree;
         }
     }
@@ -643,7 +758,8 @@ pub fn create_ctrl_tree<Item: Clone + Ord>(creation: TreeCreation<Item>) -> BTre
             tree_rec.insert(item);
             return tree_rec;
         }
-        TreeCreation::Remove(creation_rec, item) => {
+        TreeCreation::Remove(creation_rec, item)
+        | TreeCreation::RemoveExplicit(creation_rec, item) => {
             let mut tree_rec = create_ctrl_tree(*creation_rec);
             tree_rec.remove(&item);
             return tree_rec;
