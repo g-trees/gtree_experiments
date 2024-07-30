@@ -27,6 +27,14 @@ impl<S: NonemptySet> Set<S> {
     }
 }
 
+/// Join an arbitrary lesser set with a non-empty greater set.
+fn set_join<S: NonemptySet>(left: &Set<S>, right: &S) -> S {
+    match left {
+        Set::Empty => return right.clone(),
+        Set::NonEmpty(left) => return NonemptySet::join(&left, &right),
+    }
+}
+
 pub trait NonemptySet: Clone
 where
     Self: Sized,
@@ -188,15 +196,114 @@ pub fn zip3<S: NonemptySet>(
 }
 
 pub fn insert<S: NonemptySet + Debug>(t: &GTree<S>, item: S::Item, rank: u8) -> GTree<S> {
-    // println!("inserting into {:#?}\n", t);
     let (left, right) = unzip(t, &item);
-    // println!("a unzipped {:#?}\n{:#?}", left, right);
     let zipped = zip3(&left, item, rank, &right);
-    // println!("zipped {:#?}\n\n\n\n", zipped);
     return zipped;
 }
 
+pub fn insert_explicit<S: NonemptySet + Debug>(t: &GTree<S>, item: S::Item, rank: u8) -> GTree<S> {
+    // println!("insert_explicit at rank {rank}");
+    // println!("calling insert_explicit for {:?}", t);
+    match t {
+        GTree::Empty => {
+            return GTree::NonEmpty(Rc::new(GTreeNode {
+                rank,
+                set: S::singleton((item, GTree::Empty)),
+                right: GTree::Empty,
+            }))
+        }
+        GTree::NonEmpty(s) => match s.set.split(&item) {
+            (_, Some(_), _) => {
+                // The set in `s` contained `item`, so nothing more to do.
+                return t.clone();
+            }
+
+            (left_set, None, Set::Empty) => {
+                // All items in `s` are strictly less than `item`.
+
+                if rank < s.rank {
+                    return GTree::NonEmpty(Rc::new(GTreeNode {
+                        set: s.set.clone(),
+                        right: insert_explicit(&s.right, item, rank),
+                        rank: s.rank,
+                    }));
+                } else if rank == s.rank {
+                    // Insert `item` into the current node as the greatest item.
+                    // Unzip right subtree at `item` to obtain the left subtree of `item` and the new right subtree.
+                    let (l, r) = unzip(&s.right, &item);
+                    return GTree::NonEmpty(Rc::new(GTreeNode {
+                        set: set_join(&left_set, &S::singleton((item, l))), // Principled solution is adding a `insert_max` method to `NonemptySet`.
+                        right: r,
+                        rank: s.rank,
+                    }));
+                } else
+                /* rank > s.rank */
+                {
+                    // `item` becomes a singleton node. Split the right subtree of `s` at `item`. The lesser tree becomes the new right subtree of left_set to form the left subtree of the singleton node. The greater tree becomes the right subtree of the singleton node.
+                    let (l, r) = unzip(&s.right, &item);
+                    let left_subtree = lift(&left_set, l, s.rank);
+
+                    return GTree::NonEmpty(Rc::new(GTreeNode {
+                        rank,
+                        set: S::singleton((item, left_subtree)),
+                        right: r,
+                    }));
+                }
+            }
+
+            (left_set, None, Set::NonEmpty(right_set)) => {
+                // `item` is not in the set, but the set does contain strictly greater items.
+
+                let ((leftmost_item, leftmost_subtree), others) = right_set.remove_min();
+
+                if rank < s.rank {
+                    // Recursively insert into the leftmost subtree of `right_set`.
+                    let new_subtree = insert_explicit(&leftmost_subtree, item, rank);
+                    let new_right = others.insert_min((leftmost_item, new_subtree));
+
+                    return GTree::NonEmpty(Rc::new(GTreeNode {
+                        set: set_join(&left_set, &new_right),
+                        right: s.right.clone(),
+                        rank: s.rank,
+                    }));
+                } else if rank == s.rank {
+                    // Insert `item` into the right_set as a least node (that steals all items from the leftmost subtree of right_set that are less than itself).
+                    // The join left_set and the new right_set back together.
+                    let (l, r) = unzip(&leftmost_subtree, &item);
+                    // Update the leftmost subtree of `others`, and then prepend `item`.
+                    let new_right = others.insert_min((leftmost_item, r)).insert_min((item, l));
+
+                    return GTree::NonEmpty(Rc::new(GTreeNode {
+                        set: set_join(&left_set, &new_right),
+                        right: s.right.clone(),
+                        rank: s.rank,
+                    }));
+                } else
+                /* rank > s.rank */
+                {
+                    // `item` becomes a singleton node. Split the leftmost subtree of `right_set` at `item`. The lesser tree becomes the right subtree of left_set to form the left subtree of the singleton node. The greater tree becomes the new leftmost subtree of `right_set`, which together with `s.right` becomes the right subtree of the singleton node.
+                    let (l, r) = unzip(&leftmost_subtree, &item);
+
+                    let left_subtree = lift(&left_set, l, s.rank);
+                    let right_subtree = GTree::NonEmpty(Rc::new(GTreeNode {
+                        set: others.insert_min((leftmost_item, r)),
+                        right: s.right.clone(),
+                        rank: s.rank,
+                    }));
+
+                    return GTree::NonEmpty(Rc::new(GTreeNode {
+                        rank,
+                        set: S::singleton((item, left_subtree)),
+                        right: right_subtree,
+                    }));
+                }
+            }
+        },
+    }
+}
+
 pub fn delete<S: NonemptySet + Debug>(t: &GTree<S>, item: &S::Item) -> GTree<S> {
+    // println!("calling delete for {:?}", t);
     let (left, right) = unzip(t, item);
     return zip2(&left, &right);
 }
@@ -214,14 +321,10 @@ pub fn delete_explicit<S: NonemptySet + Debug>(t: &GTree<S>, item: &S::Item) -> 
                     &lift(&right_set, s.right.clone(), s.rank),
                 );
             }
-            (Set::NonEmpty(left_set), None, Set::Empty) => {
+            (left_set, None, Set::Empty) => {
                 // The set in `s` did not contain `item`, nor any greater items.
                 // Hence, `item` must be in the right subtree (if at all).
-                return lift(
-                    &Set::NonEmpty(left_set),
-                    delete_explicit(&s.right, item),
-                    s.rank,
-                );
+                return lift(&left_set, delete_explicit(&s.right, item), s.rank);
             }
             (left_set, None, Set::NonEmpty(right_set)) => {
                 // The set in `s` did not contain `item`.
@@ -230,18 +333,12 @@ pub fn delete_explicit<S: NonemptySet + Debug>(t: &GTree<S>, item: &S::Item) -> 
                 let new_subtree = delete_explicit(&leftmost_subtree, item);
                 let new_right = others.insert_min((leftmost_item, new_subtree));
 
-                match left_set {
-                    Set::Empty => return lift(&Set::NonEmpty(new_right), s.right.clone(), s.rank),
-                    Set::NonEmpty(left) => {
-                        return lift(
-                            &Set::NonEmpty(NonemptySet::join(&left, &new_right)),
-                            s.right.clone(),
-                            s.rank,
-                        )
-                    }
-                }
+                return GTree::NonEmpty(Rc::new(GTreeNode {
+                    set: set_join(&left_set, &new_right),
+                    right: s.right.clone(),
+                    rank: s.rank,
+                }));
             }
-            (Set::Empty, None, Set::Empty) => unreachable!(),
         },
     }
 }
@@ -722,6 +819,7 @@ pub fn create_set<Item: Clone + Ord, S: NonemptySetMeta<Item = Item>>(
 pub enum TreeCreation<Item> {
     Empty,
     Insert(Box<Self>, Item, u8),
+    InsertExplicit(Box<Self>, Item, u8),
     Remove(Box<Self>, Item),
     RemoveExplicit(Box<Self>, Item),
 }
@@ -735,6 +833,11 @@ pub fn create_tree<Item: Clone + Ord, S: NonemptySet<Item = Item> + Debug>(
         TreeCreation::Insert(creation_rec, item, rank) => {
             let tree_rec = create_tree(*creation_rec);
             let new_tree = insert(&tree_rec, item.clone(), rank);
+            return new_tree;
+        }
+        TreeCreation::InsertExplicit(creation_rec, item, rank) => {
+            let tree_rec = create_tree(*creation_rec);
+            let new_tree = insert_explicit(&tree_rec, item.clone(), rank);
             return new_tree;
         }
         TreeCreation::Remove(creation_rec, item) => {
@@ -753,7 +856,8 @@ pub fn create_tree<Item: Clone + Ord, S: NonemptySet<Item = Item> + Debug>(
 pub fn create_ctrl_tree<Item: Clone + Ord>(creation: TreeCreation<Item>) -> BTreeSet<Item> {
     match creation {
         TreeCreation::Empty => return BTreeSet::new(),
-        TreeCreation::Insert(creation_rec, item, _rank) => {
+        TreeCreation::Insert(creation_rec, item, _rank)
+        | TreeCreation::InsertExplicit(creation_rec, item, _rank) => {
             let mut tree_rec = create_ctrl_tree(*creation_rec);
             tree_rec.insert(item);
             return tree_rec;

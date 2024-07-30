@@ -4,8 +4,9 @@ use libfuzzer_sys::fuzz_target;
 use gtree_experiments::{*, klist::*};
 
 fuzz_target!(|data: TreeCreation<u8>| {
-    let gtree: GTree<NonemptyReverseKList<3, u8>> = create_tree(data.clone());
-    // let gtree: GTree<ControlSet<u8>> = create_tree(data.clone());
+    // println!("creation {:#?}", &data);
+    // let gtree: GTree<NonemptyReverseKList<3, u8>> = create_tree(data.clone());
+    let gtree: GTree<ControlSet<u8>> = create_tree(data.clone());
     let ctrl = create_ctrl_tree(data);
 
     for i in 0..=255 {
